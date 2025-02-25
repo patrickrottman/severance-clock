@@ -16,6 +16,10 @@ I'm a huge fan of the show and wanted to recreate one of its most distinctive vi
 
 In Severance, numbers are selected in patterns that have mysterious significance. This project takes inspiration from that aesthetic to create a clock that doesn't conventionally display the time, but rather represents it through patterns of selected numbers in a grid.
 
+## Live Website
+
+Visit the Severance Clock: [severance.patrickrottman.com](https://severance.patrickrottman.com/)
+
 ## How to Run
 
 ```bash
