@@ -22,7 +22,7 @@
   color: rgba(0, 255, 255, 0.4);
   text-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 1s ease;
 
   &.visible {
     opacity: 1;
@@ -54,9 +54,10 @@
   font-size: 14px;
   text-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
   transform-origin: center;
-  will-change: transform;
+  will-change: transform, left, top;
   top: 0;
   left: 0;
+  transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
 
   &::before {
     content: '\f245';
@@ -66,10 +67,13 @@
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
+    transition: transform 0.6s ease-out;
+    will-change: transform;
   }
 
   &.selecting {
     transform: scale(0.8);
+    transition: transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 }
 
@@ -84,15 +88,18 @@
   color: rgba(0, 255, 255, 0.7);
   position: relative;
   text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
-  transition: all 0.8s ease;
+  transition: all 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
   margin: 2px;
   will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 
   &.selected {
     color: rgba(0, 255, 255, 1);
     text-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
     z-index: 2000;
     transform-origin: center;
+    transition: color 0.8s ease-out, text-shadow 1s ease-out, transform 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
 
   &.hovered {
@@ -102,6 +109,7 @@
       0 0 20px rgba(0, 255, 255, 0.4);
     z-index: 900;
     letter-spacing: 0.02em;
+    transition: color 0.6s ease-out, text-shadow 0.8s ease-out, transform 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
 
   &.time-pattern {
@@ -118,7 +126,7 @@
     border: 1px solid rgba(0, 255, 255, 0.4);
     border-radius: 2px;
     pointer-events: none;
-    animation: subtle-pulse 2.5s infinite;
+    animation: subtle-pulse 5s infinite;
   }
 }
 
