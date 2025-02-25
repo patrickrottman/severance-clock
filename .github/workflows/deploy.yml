@@ -1,0 +1,44 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: |
+          if [ ${{ github.event_name }} == 'pull_request' ]; then
+            npm run build -- --configuration production --base-href "/pr-${{ github.event.number }}/"
+          else
+            npm run build -- --configuration production --base-href "/"
+          fi
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist/severance-time/browser
+          branch: gh-pages
+          clean: false
+          clean-exclude: |
+            pr-*/**
+          target-folder: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }} 
