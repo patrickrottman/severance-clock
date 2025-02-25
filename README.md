@@ -37,6 +37,8 @@ ng build
 
 Special thanks to the creators of "Severance" for the incredible artistic inspiration.
 
+This project was inspired by [this Reddit post](https://www.reddit.com/r/SeveranceAppleTVPlus/comments/1ix7kqi/mdr_watch_face_i_made/) showcasing an MDR watch face concept.
+
 Built with ❤️ using Claude 3.7 Sonnet and Cursor.
 
 ## Development server
