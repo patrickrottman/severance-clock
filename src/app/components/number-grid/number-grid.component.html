@@ -1,0 +1,19 @@
+<div class="grid-container">
+  <div class="number-grid" [style.grid-template-columns]="gridColumns">
+    <div class="virtual-cursor" 
+         [class.selecting]="isSelecting"
+         [style.transform]="'translate3d(' + cursorPosition.x + 'px, ' + cursorPosition.y + 'px, 0)'">
+    </div>
+    <div *ngFor="let number of numbers" 
+         class="number-cell"
+         [class.selected]="number.isSelected"
+         [class.time-pattern]="number.isTimePattern"
+         [class.hovered]="number.isHovered"
+         [style.opacity]="number.opacity"
+         [style.transform]="'translate(' + number.x + 'px, ' + number.y + 'px) scale(' + number.scale + ')'"
+         [style.z-index]="number.isSelected ? 2000 : 'auto'">
+      {{number.value}}
+      <div *ngIf="number.isSelected" class="selection-indicator"></div>
+    </div>
+  </div>
+</div> 
