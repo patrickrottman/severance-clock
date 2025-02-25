@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { TimeService } from '../../services/time.service';
 import { ResponsiveService } from '../../services/responsive.service';
 import { gsap } from 'gsap';
+import { fromEvent, Subscription } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 
 interface GridNumber {
   id?: number;
@@ -45,6 +47,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   private _animationStartTime: number | null = null;
   private _lastCursorMove: number = 0;
   private _cursorTimelines: gsap.core.Timeline[] = [];
+  private resizeSubscription: Subscription | null = null;
 
   constructor(
     private timeService: TimeService,
@@ -54,6 +57,14 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   ngOnInit() {
     // Initialize grid first
     this.initializeGrid();
+    
+    // Add resize event listener with aggressive debounce
+    this.resizeSubscription = fromEvent(window, 'resize')
+      .pipe(debounceTime(750)) // Very aggressive debounce of 750ms
+      .subscribe(() => {
+        console.log('Window resize detected - resetting everything');
+        this.resetEverything();
+      });
     
     // Get current minute for tracking changes
     const now = new Date();
@@ -145,6 +156,15 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     if (this.timeDisplayTimeout) {
       clearTimeout(this.timeDisplayTimeout);
     }
+    
+    // Clean up resize subscription
+    if (this.resizeSubscription) {
+      this.resizeSubscription.unsubscribe();
+      this.resizeSubscription = null;
+    }
+    
+    // Ensure all GSAP animations are cleaned up
+    gsap.globalTimeline.clear();
   }
 
   private updateTimeDisplay(time: { hour: number, minute: number }) {
@@ -1947,5 +1967,65 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     }
     
     this._lastCursorMove = Date.now();
+  }
+
+  private resetEverything(): void {
+    console.log('Performing complete reset of application state due to resize');
+    
+    // First, check if we're in the middle of an animation
+    if (this.isAnimating) {
+      console.log('Animation in progress - stopping all animations');
+      this.endAnimation();
+    }
+    
+    // Kill ALL GSAP animations
+    gsap.globalTimeline.clear();
+    this._cursorTimelines.forEach(timeline => {
+      if (timeline.isActive()) {
+        timeline.kill();
+      }
+    });
+    this._cursorTimelines = [];
+    
+    // Clear all selections and states
+    this.clearSelections();
+    
+    // Reset cursor position based on new window size
+    this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
+    
+    // Remove any animation overlays that might be stuck
+    const overlays = document.querySelectorAll('body > div[style*="z-index: 9999"]');
+    overlays.forEach(overlay => {
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    });
+    
+    // Reset any number cells visibility
+    const numberCells = document.querySelectorAll('.number-cell');
+    Array.from(numberCells).forEach(cell => {
+      (cell as HTMLElement).style.visibility = '';
+    });
+    
+    // Get current minute to prevent immediate binning
+    const now = new Date();
+    this.lastCheckedMinute = now.getMinutes();
+    
+    // Finally, reinitialize the grid with new dimensions
+    this.initializeGrid();
+    
+    // Start with quick initial time selection (without binning) after a delay
+    // to give the DOM time to update
+    setTimeout(() => {
+      console.log('Starting initial time selection after reset');
+      this.beginAnimation();
+      this.quickInitialTimeSelection().then(() => {
+        this.endAnimation();
+        console.log('Initial time selection after reset complete');
+      }).catch(err => {
+        console.error('Error in initial time selection after reset:', err);
+        this.endAnimation();
+      });
+    }, 1000);
   }
 } 

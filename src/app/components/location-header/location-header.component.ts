@@ -58,6 +58,45 @@ import { TimeService } from '../../services/time.service';
       border-radius: 50%;
       padding: 0.5rem 1rem;
     }
+
+    /* Media queries for mobile responsiveness */
+    @media (max-width: 768px) {
+      .location-name {
+        font-size: 1.1rem;
+        min-width: 80px;
+      }
+      
+      .progress-text {
+        font-size: 1.1rem;
+      }
+      
+      .company-logo {
+        font-size: 1rem;
+        padding: 0.4rem 0.8rem;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .location-header {
+        padding: 0.4rem 0.6rem;
+      }
+      
+      .location-name {
+        font-size: 0.9rem;
+        padding-right: 0.5rem;
+        margin-right: 0.5rem;
+        min-width: 60px;
+      }
+      
+      .progress-text {
+        font-size: 0.9rem;
+      }
+      
+      .company-logo {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.6rem;
+      }
+    }
   `]
 })
 export class LocationHeaderComponent implements OnInit {
