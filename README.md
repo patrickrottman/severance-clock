@@ -1,6 +1,6 @@
-# Severance Time
+# Severance Clock
 
-A homage to Apple TV's "Severance" series, recreating the iconic number selection and binning animation sequence from the show.
+A homage to Apple TV's "Severance" series, recreating the iconic mysterious number grid animation sequence from the show, reimagined as a clock.
 
 ## About This Project
 
@@ -10,7 +10,11 @@ This project was built as a creative experiment using:
 - Claude 3.7 Sonnet
 - Cursor AI
 
-I'm a huge fan of the show and wanted to recreate one of its most distinctive visual elements - the mysterious number grid and time management system from Lumon Industries.
+I'm a huge fan of the show and wanted to recreate one of its most distinctive visual elements - the mysterious number grid from Lumon Industries. This implementation repurposes the concept as a unique, enigmatic clock display.
+
+## The Concept
+
+In Severance, numbers are selected in patterns that have mysterious significance. This project takes inspiration from that aesthetic to create a clock that doesn't conventionally display the time, but rather represents it through patterns of selected numbers in a grid.
 
 ## How to Run
 
