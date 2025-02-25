@@ -70,9 +70,10 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     setInterval(() => {
       if (this.isAnimating) {
         console.log('Animation safety check - how long has animation been running?');
-        // If animation has been running for more than 20 seconds, force reset
+        // If animation has been running for more than 60 seconds, force reset
+        // Increased from 20 seconds to 60 seconds to accommodate slower animations
         const animatingTooLong = this._animationStartTime && 
-                                (Date.now() - this._animationStartTime > 20000);
+                                (Date.now() - this._animationStartTime > 60000);
         if (animatingTooLong) {
           console.warn('Animation appears stuck - forcing reset');
           this.resetAnimationState();
@@ -444,17 +445,17 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Create the entrance animation
     const entranceTimeline = gsap.timeline();
     
-    // Animate numbers scrolling into view
+    // Animate numbers scrolling into view with a slower, more deliberate pace
     this.numbers.forEach((number, index) => {
       // Stagger the animations for a wave effect
-      const delay = Math.random() * 0.5; // Random delay for natural feel
+      const delay = Math.random() * 0.8; // Longer random delay for a more mysterious feel
       
       entranceTimeline.to(number, {
         y: 0, // Final position
         x: 0,
         opacity: number.opacity, // Restore original opacity
-        duration: 0.7,
-        ease: "back.out(1.2)",
+        duration: 1.5, // Slower entrance
+        ease: "power1.inOut", // More subtle easing
         delay: delay
       }, 0); // All start at the same time but with individual delays
     });
@@ -462,17 +463,17 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Add floating animation for non-time digits after they arrive
     entranceTimeline.add(() => {
       // Add subtle floating animation only to non-time pattern numbers
-    this.numbers.forEach(number => {
-      if (!number.isTimePattern) {
-        gsap.to(number, {
-          y: () => (Math.random() * 10 - 5),
-          duration: 2 + Math.random() * 2,
-          repeat: -1,
-          yoyo: true,
-          ease: 'power1.inOut'
-        });
-      }
-    });
+      this.numbers.forEach(number => {
+        if (!number.isTimePattern) {
+          gsap.to(number, {
+            y: () => (Math.random() * 8 - 4), // More subtle movement
+            duration: 4 + Math.random() * 3, // Much slower floating
+            repeat: -1,
+            yoyo: true,
+            ease: 'sine.inOut' // Gentler sine wave motion
+          });
+        }
+      });
     });
     
     // Start the animation
@@ -583,19 +584,19 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   private async simulateSearching(): Promise<void> {
     const cells = document.querySelectorAll('.number-cell');
     
-    // More natural search pattern
+    // More natural search pattern with slower movements
     const searchPattern = [
-      { x: window.innerWidth * 0.3, y: window.innerHeight * 0.3, duration: 0.6 },
-      { x: window.innerWidth * 0.7, y: window.innerHeight * 0.3, duration: 0.5 },
-      { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, duration: 0.4 },
-      { x: window.innerWidth * 0.3, y: window.innerHeight * 0.7, duration: 0.5 },
-      { x: window.innerWidth * 0.7, y: window.innerHeight * 0.7, duration: 0.6 }
+      { x: window.innerWidth * 0.3, y: window.innerHeight * 0.3, duration: 1.8 },
+      { x: window.innerWidth * 0.7, y: window.innerHeight * 0.3, duration: 1.6 },
+      { x: window.innerWidth * 0.5, y: window.innerHeight * 0.5, duration: 1.4 },
+      { x: window.innerWidth * 0.3, y: window.innerHeight * 0.7, duration: 1.6 },
+      { x: window.innerWidth * 0.7, y: window.innerHeight * 0.7, duration: 1.8 }
     ];
 
-    // Natural cursor movements using absolute pixel values
+    // Natural cursor movements using absolute pixel values with longer pauses
     for (const position of searchPattern) {
       await this.moveCursorTo(position.x, position.y, position.duration);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
     // Check a few random cells with natural movement
@@ -603,8 +604,8 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       const randomCell = cells[Math.floor(Math.random() * cells.length)] as HTMLElement;
       if (randomCell) {
         const pos = this.getNumberPosition(randomCell, 'search');
-        await this.moveCursorTo(pos.x, pos.y, 0.4);
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await this.moveCursorTo(pos.x, pos.y, 1.2); // Slower movement to each cell
+        await new Promise(resolve => setTimeout(resolve, 500)); // Longer pause at each cell
       }
     }
   }
@@ -910,8 +911,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Reset any previous hover states
     this.numbers.forEach(num => num.isHovered = false);
     
-    // Give the DOM MUCH more time to render fully before calculating positions
-    // Increasing from 200ms to 500ms as requested for debugging
+    // Give the DOM time to render fully before calculating positions
     console.log('Waiting for DOM to fully render before calculating hover positions...');
     await new Promise(resolve => setTimeout(resolve, 500));
     
@@ -966,8 +966,51 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     
     console.log(`Calculated ${positions.length} valid positions for hover`);
     
-    // Hover over each cell in sequence
-    for (const { cell, cellIndex, position, isValid } of positions) {
+    // IMPROVEMENT: Plan the cursor path to be smoother
+    // Sort positions by proximity to create a smoother path
+    if (positions.length > 2) {
+      // Start with the closest position to current cursor
+      let currentPos = { x: this.cursorPosition.x, y: this.cursorPosition.y };
+      const sortedPositions = [];
+      const remainingPositions = [...positions];
+      
+      // For each step, find the closest next position
+      while (remainingPositions.length > 0) {
+        // Find index of closest position
+        let closestIdx = 0;
+        let closestDist = Number.MAX_SAFE_INTEGER;
+        
+        remainingPositions.forEach((pos, idx) => {
+          const dist = Math.sqrt(
+            Math.pow(currentPos.x - pos.position.x, 2) + 
+            Math.pow(currentPos.y - pos.position.y, 2)
+          );
+          if (dist < closestDist) {
+            closestDist = dist;
+            closestIdx = idx;
+          }
+        });
+        
+        // Add closest to sorted list and remove from remaining
+        const next = remainingPositions.splice(closestIdx, 1)[0];
+        sortedPositions.push(next);
+        
+        // Update current position
+        currentPos = next.position;
+      }
+      
+      // Use the optimized path if we found one
+      if (sortedPositions.length === positions.length) {
+        console.log('Using optimized hover path for smoother cursor movement');
+        positions.length = 0;
+        positions.push(...sortedPositions);
+      }
+    }
+    
+    // Hover over each cell in sequence with smoother transitions
+    for (let i = 0; i < positions.length; i++) {
+      const { cell, cellIndex, position, isValid } = positions[i];
+      
       if (!isValid) {
         console.warn(`Skipping invalid cell position: ${position.x}, ${position.y}`);
         continue;
@@ -984,40 +1027,53 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       // Mark the cell as hovered in our model
       this.numbers[cellIndex].isHovered = true;
       
-      // MATCHING CLICK BEHAVIOR: Only move cursor if not already very close to target
-      // This matches the optimization used in the click phase
-      if (Math.abs(this.cursorPosition.x - position.x) > 1 || Math.abs(this.cursorPosition.y - position.y) > 1) {
-        // Use exact same duration/easing as click for consistency (0.4s vs previous 0.6s)
-        await this.moveCursorTo(position.x, position.y, 0.4, 'power2.out');
+      // Adjust movement duration based on distance from previous position
+      let moveDuration = 1.2; // Default duration
+      
+      // If this isn't the first position, calculate distance from previous
+      if (i > 0) {
+        const prevPos = positions[i-1].position;
+        const distance = Math.sqrt(
+          Math.pow(prevPos.x - position.x, 2) + 
+          Math.pow(prevPos.y - position.y, 2)
+        );
         
-        // Log final cursor position after movement for debugging
-        console.log(`Cursor moved to: ${this.cursorPosition.x}, ${this.cursorPosition.y} for hover`);
-      } else {
-        console.log(`Cursor already at position (${position.x}, ${position.y}), skipping movement`);
+        // Scale duration based on distance
+        moveDuration = Math.min(2.0, Math.max(0.8, distance / 100));
       }
       
-      // Wait to ensure cursor has arrived at position - keeping same timing as click (300ms)
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Only move cursor if not already very close to target
+      if (Math.abs(this.cursorPosition.x - position.x) > 1 || Math.abs(this.cursorPosition.y - position.y) > 1) {
+        // Use sine easing for smoother motion
+        await this.moveCursorTo(position.x, position.y, moveDuration, 'sine.inOut');
+        
+        // Small pause to ensure cursor has settled
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
       
-      // Animate the number scaling up
-      await gsap.to(this.numbers[cellIndex], {
+      // Create a single timeline for the scale animation to avoid interruptions
+      const scaleTimeline = gsap.timeline();
+      
+      // Animate the number scaling up more slowly with a smoother curve
+      scaleTimeline.to(this.numbers[cellIndex], {
         scale: 1.35,
-        duration: 0.5,
-        ease: 'power2.out'
+        duration: 1.2,
+        ease: 'sine.inOut' // Gentler sine easing
+      })
+      .to(this.numbers[cellIndex], {
+        scale: 1.15, // Scale back down to a slightly larger than normal size
+        duration: 0.9,
+        ease: 'sine.inOut',
+        delay: 0.5 // Built-in delay at peak scale
       });
       
-      // Hold at the peak for a moment (increased for better visibility)
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      // Scale back down to a slightly larger than normal size
-      await gsap.to(this.numbers[cellIndex], {
-        scale: 1.15,
-        duration: 0.3,
-        ease: 'power2.inOut'
+      // Wait for scale animation to complete
+      await new Promise(resolve => {
+        scaleTimeline.eventCallback("onComplete", resolve);
       });
       
-      // Slight pause between numbers
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Smaller pause between numbers
+      await new Promise(resolve => setTimeout(resolve, 150));
     }
     
     return Promise.resolve();
@@ -1078,7 +1134,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
         });
         
         resolve();
-      }, 5000); // 5 seconds absolute maximum for animation
+      }, 10000); // Increased from 5000 to 10000 (10 seconds) absolute maximum for animation
       
       try {
         // Important: Get all required calculations and references up front
@@ -1260,18 +1316,18 @@ export class NumberGridComponent implements OnInit, OnDestroy {
           left: centerX,
           top: centerY,
           scale: 1.2,
-          duration: 0.4,
-          ease: "power1.out",
+          duration: 1.2, // Slower gathering
+          ease: "power1.inOut", // More subtle easing
           onStart: () => console.log('Starting gather animation to group center')
         });
         
-        // Step 2: Move to bin and fade out
+        // Step 2: Move to bin and fade out - slower for dramatic effect
         tl.to(clones, {
           left: binFixedX,
           top: binFixedY + 20, // Move slightly into the bin
           opacity: 0,
           scale: 0.5,
-          duration: 0.5,
+          duration: 1.8, // Much slower fade out
           ease: "power1.in",
           onStart: () => console.log('Starting bin animation')
         });
@@ -1308,7 +1364,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
             // Resolve promise
             resolve();
           }
-        }, 2000); // Trigger after 2 seconds
+        }, 5000); // Increased from 2000 to 5000 (5 seconds)
       }
       catch (error) {
         console.error('Error in disposeSelectedNumbers:', error);
@@ -1440,7 +1496,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       
       // Safety check: if animation has been running too long, reset it
       const animatingTooLong = this._animationStartTime && 
-                              (Date.now() - this._animationStartTime > 20000);
+                              (Date.now() - this._animationStartTime > 60000);
       if (animatingTooLong) {
         console.warn('Animation has been running too long - forcing reset');
         this.resetAnimationState();
@@ -1686,12 +1742,12 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   }
 
   private setCursorPosition(x: number, y: number): void {
-    console.log(`Setting cursor position to ${x}, ${y}`);
+    // Immediately set position for non-user initiated movements
     this.cursorPosition = { x, y };
     this._lastCursorMove = Date.now();
   }
 
-  private async moveCursorTo(x: number, y: number, duration: number = 0.4, ease: string = 'power2.out'): Promise<void> {
+  private async moveCursorTo(x: number, y: number, duration: number = 1.2, ease: string = "sine.inOut"): Promise<void> {
     // Validate position
     if (isNaN(x) || isNaN(y)) {
       console.warn(`Invalid cursor position (NaN): ${x}, ${y} - using fallback`);
@@ -1718,80 +1774,72 @@ export class NumberGridComponent implements OnInit, OnDestroy {
         x = Math.min(containerRect.width * 0.5, window.innerWidth * 0.3);
         y = Math.min(containerRect.height * 0.5, window.innerHeight * 0.3);
       }
-    } else if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
-      // Fallback validation if container not found
-      console.warn(`Invalid cursor position (out of viewport): ${x}, ${y} - using fallback`);
-      x = window.innerWidth * 0.3;
-      y = window.innerHeight * 0.3;
     }
     
-    console.log(`Moving cursor to ${x}, ${y} with duration ${duration}`);
+    // Calculate distance to the target
+    const distanceToTarget = Math.sqrt(
+      Math.pow(this.cursorPosition.x - x, 2) + 
+      Math.pow(this.cursorPosition.y - y, 2)
+    );
     
-    // Kill any in-progress animations to avoid conflicts
-    this._cursorTimelines.forEach(timeline => {
-      if (timeline && timeline.isActive()) {
-        timeline.kill();
-      }
-    });
+    // For very small movements, reduce duration to avoid overanimation
+    if (distanceToTarget < 10) {
+      duration = Math.max(0.3, duration * 0.5);
+    }
     
-    // Create and track the timeline
-    const timeline = gsap.timeline();
-    this._cursorTimelines.push(timeline);
+    // For longer movements, ensure duration is long enough for smooth motion
+    if (distanceToTarget > 200) {
+      duration = Math.max(duration, 1.5);
+    }
     
+    // Only kill existing animations if we're making a significant movement
+    // This prevents the "quick darks" during hover
+    if (distanceToTarget > 10) {
+      // Small delay before killing existing animations to avoid jitter
+      await new Promise(resolve => setTimeout(resolve, 10));
+      gsap.killTweensOf(this.cursorPosition);
+    }
+    
+    // Create a promise to track completion
     return new Promise((resolve) => {
-      try {
-        // Set a safety timeout in case the animation gets stuck
-        const timeoutId = setTimeout(() => {
-          console.warn('Cursor movement timed out, forcing completion');
-          const index = this._cursorTimelines.indexOf(timeline);
-          if (index > -1) {
-            this._cursorTimelines.splice(index, 1);
-          }
-          
-          // Force cursor to target position
-          this.cursorPosition.x = x;
-          this.cursorPosition.y = y;
-          this._lastCursorMove = Date.now();
-          
-          resolve();
-        }, duration * 1000 * 2); // 2x the expected duration as timeout
+      // Create a timeline for more precise control
+      const timeline = gsap.timeline({
+        onComplete: resolve
+      });
+      
+      // Add the movement animation to the timeline with smoother easing
+      timeline.to(this.cursorPosition, {
+        x,
+        y,
+        duration,
+        ease, // Default is now sine.inOut for smoother motion
+        overwrite: "auto"
+      });
+      
+      // Add curve correction if the distance is significant
+      // This gives a more natural feel to longer movements
+      if (distanceToTarget > 100) {
+        // Add a small curve to the motion for a more natural feel
+        const midX = (this.cursorPosition.x + x) / 2 + (Math.random() * 20 - 10);
+        const midY = (this.cursorPosition.y + y) / 2 + (Math.random() * 20 - 10);
         
+        timeline.clear();
         timeline.to(this.cursorPosition, {
-          x: x,
-          y: y,
-          duration: duration,
-          ease: ease,
-          onUpdate: () => {
-            this._lastCursorMove = Date.now();
-          },
-          onComplete: () => {
-            clearTimeout(timeoutId);
-            const index = this._cursorTimelines.indexOf(timeline);
-            if (index > -1) {
-              this._cursorTimelines.splice(index, 1);
-            }
-            
-            // Ensure the cursor is exactly at the target position
-            this.cursorPosition.x = x;
-            this.cursorPosition.y = y;
-            
-            resolve();
-          }
+          x: midX,
+          y: midY,
+          duration: duration * 0.5,
+          ease: "sine.in"
+        }).to(this.cursorPosition, {
+          x,
+          y,
+          duration: duration * 0.5,
+          ease: "sine.out"
         });
-      } catch (err) {
-        console.error('Error setting up cursor animation:', err);
-        // Force cursor to target position on error
-        this.cursorPosition.x = x;
-        this.cursorPosition.y = y;
-        this._lastCursorMove = Date.now();
-        
-        const index = this._cursorTimelines.indexOf(timeline);
-        if (index > -1) {
-          this._cursorTimelines.splice(index, 1);
-        }
-        
-        resolve(); // Still resolve to avoid blocking the chain
       }
+      
+      // Store the timeline for potential cleanup
+      this._cursorTimelines.push(timeline);
+      this._lastCursorMove = Date.now();
     });
   }
 
@@ -1799,27 +1847,27 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     number.isSelected = true;
     number.isHovered = true; // Also set hover state when selecting
     
-    // Add click effect
+    // Add click effect with longer duration
     const virtualCursor = document.querySelector('.virtual-cursor');
     if (virtualCursor) {
       virtualCursor.classList.add('selecting');
-      setTimeout(() => virtualCursor.classList.remove('selecting'), 300);
+      setTimeout(() => virtualCursor.classList.remove('selecting'), 800);
     }
     
-    // Make the selection more dramatic
+    // Make the selection more dramatic with slower animation
     await gsap.to(number, {
       scale: 1.5,
-      duration: 0.3,
-      ease: 'back.out(1.5)'
+      duration: 1.0,
+      ease: 'back.out(1.2)'
     });
     
-    // Pause briefly at the peak of the animation
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Pause longer at the peak of the animation
+    await new Promise(resolve => setTimeout(resolve, 400));
     
     await gsap.to(number, {
       scale: 1.2,
-      duration: 0.2,
-      ease: 'power2.in'
+      duration: 0.8,
+      ease: 'power1.inOut'
     });
   }
 
@@ -1851,5 +1899,53 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     
     // Update the time service with the current hour percentage
     this.timeService.updateHourPercentage(this.hourPercentage);
+  }
+
+  @HostListener('mousemove', ['$event'])
+  onMouseMove(event: MouseEvent) {
+    const gridContainer = document.querySelector('.grid-container');
+    if (gridContainer) {
+      const rect = gridContainer.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      
+      // Don't use direct position setting, use GSAP to smooth the cursor movement
+      this.smoothCursorMove(x, y);
+    }
+  }
+
+  // Add a new method for smoother cursor movement
+  private smoothCursorMove(x: number, y: number): void {
+    // Calculate distance to the target
+    const distanceToTarget = Math.sqrt(
+      Math.pow(this.cursorPosition.x - x, 2) + 
+      Math.pow(this.cursorPosition.y - y, 2)
+    );
+    
+    // Only kill existing animations if moving a significant distance
+    // This prevents jittery movement when the mouse is relatively still
+    if (distanceToTarget > 5) {
+      gsap.killTweensOf(this.cursorPosition);
+      
+      // For longer movements, use a smoother, slower animation
+      gsap.to(this.cursorPosition, {
+        x: Math.round(x),
+        y: Math.round(y),
+        duration: 0.5,  // Slightly reduced for more responsiveness
+        ease: "sine.out", // Much gentler easing function for smoother motion
+        overwrite: "auto"
+      });
+    } else {
+      // For tiny movements, keep it extra gentle to avoid jitter
+      gsap.to(this.cursorPosition, {
+        x: Math.round(x),
+        y: Math.round(y),
+        duration: 0.3,
+        ease: "sine.out",
+        overwrite: "auto"
+      });
+    }
+    
+    this._lastCursorMove = Date.now();
   }
 } 

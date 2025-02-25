@@ -2,21 +2,10 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, catchError, map } from 'rxjs';
 
-interface IpApiResponse {
-  status: string;
-  country: string;
-  countryCode: string;
-  region: string;
-  regionName: string;
+interface IpapiResponse {
   city: string;
-  zip: string;
-  lat: number;
-  lon: number;
-  timezone: string;
-  isp: string;
-  org: string;
-  as: string;
-  query: string;
+  region: string;
+  country_name: string;
 }
 
 @Injectable({
@@ -35,10 +24,11 @@ export class LocationService {
       return of(this.locationCache);
     }
 
-    return this.http.get<IpApiResponse>('http://ip-api.com/json')
+    // Using ipapi.co which supports HTTPS and doesn't require browser permissions
+    return this.http.get<IpapiResponse>('https://ipapi.co/json/')
       .pipe(
         map(response => {
-          if (response.status === 'success' && response.city) {
+          if (response && response.city) {
             this.locationCache = response.city;
             return response.city;
           } else {
