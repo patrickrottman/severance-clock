@@ -1,0 +1,82 @@
+.footer-container {
+  background-color: rgba(10, 25, 47, 0.95);
+  border-top: 1px solid rgba(0, 255, 255, 0.2);
+  padding: 5px 0;
+  width: 100%;
+  font-family: 'Courier Prime', 'Courier New', monospace;
+  z-index: 1000;
+  position: relative;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 20px;
+}
+
+.footer-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.footer-link {
+  display: flex;
+  align-items: center;
+  color: rgba(0, 255, 255, 0.8);
+  text-decoration: none;
+  font-size: 12px;
+  padding: 3px 8px;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.footer-link:hover {
+  color: rgba(0, 255, 255, 1);
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+}
+
+.link-icon {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+.footer-divider {
+  color: rgba(0, 255, 255, 0.4);
+  margin: 0 3px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .footer-links {
+    flex-direction: column;
+    gap: 3px;
+  }
+  
+  .footer-divider {
+    display: none;
+  }
+}
+
+.fullscreen-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Courier Prime', 'Courier New', monospace;
+}
+
+/* Make it match other footer links */
+button.footer-link {
+  padding: 3px 8px;
+  color: rgba(0, 255, 255, 0.8);
+  font-size: 12px;
+}
+
+button.footer-link:hover {
+  color: rgba(0, 255, 255, 1);
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+} 

@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { NumberGridComponent } from './components/number-grid/number-grid.component';
 import { BinsComponent } from './components/bins/bins.component';
 import { LocationHeaderComponent } from './components/location-header/location-header.component';
+import { WelcomeModalComponent } from './components/welcome-modal/welcome-modal.component';
+import { FooterComponent } from './components/footer/footer.component';
 
 @Component({
   selector: 'app-root',
@@ -11,28 +13,37 @@ import { LocationHeaderComponent } from './components/location-header/location-h
     CommonModule,
     NumberGridComponent,
     BinsComponent,
-    LocationHeaderComponent
+    LocationHeaderComponent,
+    WelcomeModalComponent,
+    FooterComponent
   ],
-  template: `
-    <div class="severance-container">
-      <app-location-header></app-location-header>
-      <app-number-grid></app-number-grid>
-      <app-bins></app-bins>
-    </div>
-  `,
-  styles: [`
-    .severance-container {
-      background-color: #0a192f;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      color: #00ffff;
-      font-family: 'Courier New', monospace;
-      overflow: hidden;
-      border: 1px solid rgba(0, 255, 255, 0.3);
-    }
-  `]
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss']
 })
 export class AppComponent {
-  title = 'severance-time';
+  title = 'severence-clock';
+  isFullScreen = false;
+  
+  toggleFullScreen() {
+    if (!document.fullscreenElement) {
+      // Enter fullscreen
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
+      }
+      this.isFullScreen = true;
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+      this.isFullScreen = false;
+    }
+  }
+  
+  constructor() {
+    // Listen for fullscreen change events
+    document.addEventListener('fullscreenchange', () => {
+      this.isFullScreen = !!document.fullscreenElement;
+    });
+  }
 }

@@ -1,0 +1,30 @@
+<div class="modal-overlay" *ngIf="showModal" (click)="onOverlayClick($event)">
+  <div class="modal-content" [class.visible]="contentVisible">
+    <div class="modal-header">
+      <div class="lumon-logo">LUMON</div>
+      <div class="header-text">MDR Division</div>
+    </div>
+    
+    <div class="modal-body">
+      <div class="greeting">Welcome, Valued Employee</div>
+      <div class="message">
+        <p>This terminal functions as a <strong>digital clock</strong>, displaying the current time through Macrodata Refinement protocols.</p>
+        <p>The system continuously identifies and highlights digits representing hours and minutes in the number field.</p>
+        <p>All extraneous numbers are systematically isolated and sorted into refinement bins as per standard procedure.</p>
+      </div>
+      
+      <div class="support-message">
+        <p>Is this experience satisfactory? Consider contributing to continued optimization efforts.</p>
+        <a href="https://buymeacoffee.com/patrickrottman" target="_blank" class="coffee-link">
+          <span class="coffee-icon">☕</span> Support Optimization
+        </a>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="acknowledge-btn" (click)="closeModal()">Acknowledge</button>
+    </div>
+    
+    <div class="scan-line"></div>
+  </div>
+</div> 
