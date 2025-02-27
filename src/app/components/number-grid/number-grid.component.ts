@@ -49,6 +49,10 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   private _cursorTimelines: gsap.core.Timeline[] = [];
   private resizeSubscription: Subscription | null = null;
   private _binnedPositions: Set<number> = new Set<number>();
+  private _isResetting = false;  // Add flag to prevent multiple resets
+  private _resetTimeout: any;    // Track reset timeout
+  private _visibilityTimeout: any;  // Track visibility timeout
+  private _lastVisibilityChange = 0;  // Track last visibility change
 
   constructor(
     private timeService: TimeService,
@@ -161,6 +165,12 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     if (this.timeDisplayTimeout) {
       clearTimeout(this.timeDisplayTimeout);
     }
+    if (this._resetTimeout) {
+      clearTimeout(this._resetTimeout);
+    }
+    if (this._visibilityTimeout) {
+      clearTimeout(this._visibilityTimeout);
+    }
     
     // Clean up resize subscription
     if (this.resizeSubscription) {
@@ -178,26 +188,31 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   // Handle tab visibility changes
   private handleVisibilityChange = (): void => {
     if (!document.hidden) {
+      // Debounce visibility changes
+      const now = Date.now();
+      if (now - this._lastVisibilityChange < 1000) {
+        console.log('Debouncing visibility change');
+        return;
+      }
+      this._lastVisibilityChange = now;
+
+      // Clear any pending visibility timeouts
+      if (this._visibilityTimeout) {
+        clearTimeout(this._visibilityTimeout);
+      }
+      
       // Tab has become visible again
       console.log('Tab visibility changed to visible - resetting everything');
-      this.resetEverything();
       
       // Handle any animations that might have been in progress
       if (this.isAnimating) {
         this.endAnimation();
       }
       
-      // Start with clean time selection after reset
-      setTimeout(() => {
-        this.beginAnimation();
-        this.quickInitialTimeSelection().then(() => {
-          this.endAnimation();
-          console.log('Time selection refreshed after tab switch');
-        }).catch(err => {
-          console.error('Error refreshing time selection after tab switch:', err);
-          this.endAnimation();
-        });
-      }, 1000);
+      // Schedule reset with a slight delay to ensure proper cleanup
+      this._visibilityTimeout = setTimeout(() => {
+        this.resetEverything();
+      }, 100);
     }
   }
 
@@ -227,8 +242,20 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       });
     }
     
+    // Ensure we have a clean grid container
+    const existingGrids = document.querySelectorAll('.grid-container');
+    if (existingGrids.length === 0) {
+      console.warn('No grid container found, one will be created by the template');
+    } else if (existingGrids.length > 1) {
+      console.warn(`Multiple grid containers found (${existingGrids.length}), cleaning up`);
+      Array.from(existingGrids).slice(1).forEach(grid => {
+        if (grid.parentNode) {
+          grid.parentNode.removeChild(grid);
+        }
+      });
+    }
+    
     // CRITICAL FIX: Reset binned positions when generating a new grid
-    // This prevents previous minute's binned numbers from affecting the new grid
     this._binnedPositions = new Set<number>();
     console.log('Reset binned positions during grid initialization');
     
@@ -2233,7 +2260,22 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   }
 
   private resetEverything(): void {
-    console.log('Performing complete reset of application state due to resize');
+    // Prevent multiple resets from running simultaneously
+    if (this._isResetting) {
+      console.log('Reset already in progress, skipping');
+      return;
+    }
+    
+    this._isResetting = true;
+    console.log('Performing complete reset of application state');
+    
+    // Clear any pending timeouts
+    if (this._resetTimeout) {
+      clearTimeout(this._resetTimeout);
+    }
+    if (this.timeSelectionTimeout) {
+      clearTimeout(this.timeSelectionTimeout);
+    }
     
     // First, check if we're in the middle of an animation
     if (this.isAnimating) {
@@ -2260,39 +2302,81 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Reset cursor position based on new window size
     this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
     
-    // Remove any animation overlays that might be stuck
+    // IMPORTANT: Clean up ALL grid-related elements
+    // First, remove any animation overlays
     const overlays = document.querySelectorAll('body > div[style*="z-index: 9999"]');
     overlays.forEach(overlay => {
       if (overlay.parentNode) {
         overlay.parentNode.removeChild(overlay);
       }
     });
-    
-    // Reset any number cells visibility
+
+    // Clean up grid containers properly
+    const gridContainers = document.querySelectorAll('.grid-container');
+    if (gridContainers.length > 1) {
+      console.warn(`Found ${gridContainers.length} grid containers, cleaning up extras`);
+      // Keep only the first grid container, remove others
+      Array.from(gridContainers).slice(1).forEach(container => {
+        if (container.parentNode) {
+          container.parentNode.removeChild(container);
+        }
+      });
+    }
+
+    // Clean up inner number grids
+    const numberGrids = document.querySelectorAll('.number-grid');
+    if (numberGrids.length > 1) {
+      console.warn(`Found ${numberGrids.length} number grids, cleaning up extras`);
+      Array.from(numberGrids).slice(1).forEach(grid => {
+        if (grid.parentNode) {
+          grid.parentNode.removeChild(grid);
+        }
+      });
+    }
+
+    // Clean up any orphaned number cells
     const numberCells = document.querySelectorAll('.number-cell');
-    Array.from(numberCells).forEach(cell => {
-      (cell as HTMLElement).style.visibility = '';
+    numberCells.forEach(cell => {
+      const isInValidGrid = cell.closest('.number-grid');
+      if (!isInValidGrid && cell.parentNode) {
+        cell.parentNode.removeChild(cell);
+      }
     });
+    
+    // Reset any remaining number cells visibility
+    const remainingCells = document.querySelectorAll('.grid-container:first-child .number-cell');
+    Array.from(remainingCells).forEach(cell => {
+      (cell as HTMLElement).style.visibility = '';
+      (cell as HTMLElement).style.opacity = '';
+      (cell as HTMLElement).style.transform = '';
+    });
+    
+    // Clear the numbers array before reinitializing
+    this.numbers = [];
     
     // Get current minute to prevent immediate binning
     const now = new Date();
     this.lastCheckedMinute = now.getMinutes();
     
     // Finally, reinitialize the grid with new dimensions
-    this.initializeGrid();
-    
-    // Start with quick initial time selection (without binning) after a delay
-    // to give the DOM time to update
+    // Add a small delay to ensure DOM is clean
     setTimeout(() => {
-      console.log('Starting initial time selection after reset');
-      this.beginAnimation();
-      this.quickInitialTimeSelection().then(() => {
-        this.endAnimation();
-        console.log('Initial time selection after reset complete');
-      }).catch(err => {
-        console.error('Error in initial time selection after reset:', err);
-        this.endAnimation();
-      });
-    }, 1000);
+      this.initializeGrid();
+      
+      // Start with quick initial time selection after grid is initialized
+      this._resetTimeout = setTimeout(() => {
+        console.log('Starting initial time selection after reset');
+        this.beginAnimation();
+        this.quickInitialTimeSelection().then(() => {
+          this.endAnimation();
+          console.log('Initial time selection after reset complete');
+          this._isResetting = false;  // Reset can happen again
+        }).catch(err => {
+          console.error('Error in initial time selection after reset:', err);
+          this.endAnimation();
+          this._isResetting = false;  // Reset can happen again
+        });
+      }, 500);  // Reduced from 1000ms to 500ms for better responsiveness
+    }, 100);
   }
 } 
