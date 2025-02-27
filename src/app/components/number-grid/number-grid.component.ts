@@ -194,6 +194,11 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       });
     }
     
+    // CRITICAL FIX: Reset binned positions when generating a new grid
+    // This prevents previous minute's binned numbers from affecting the new grid
+    this._binnedPositions = new Set<number>();
+    console.log('Reset binned positions during grid initialization');
+    
     const match = this.gridColumns.match(/\d+/);
     if (!match) return;
     
