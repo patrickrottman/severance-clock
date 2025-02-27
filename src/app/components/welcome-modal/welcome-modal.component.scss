@@ -14,8 +14,9 @@
 
 .modal-content {
   background-color: #0a192f;
-  width: 90%;
+  width: 95%;
   max-width: 600px;
+  max-height: 95vh;
   border: 2px solid rgba(0, 255, 255, 0.5);
   color: rgba(0, 255, 255, 0.9);
   font-family: 'Courier Prime', 'Courier New', monospace;
@@ -25,6 +26,8 @@
   transform: scale(0.95);
   transition: all 0.3s ease;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-content.visible {
@@ -38,6 +41,7 @@
   text-align: center;
   border-bottom: 1px solid rgba(0, 255, 255, 0.3);
   position: relative;
+  flex-shrink: 0;
 }
 
 .lumon-logo {
@@ -55,6 +59,9 @@
 .modal-body {
   padding: 25px;
   line-height: 1.6;
+  overflow-y: auto;
+  flex-grow: 1;
+  -webkit-overflow-scrolling: touch;
 }
 
 .greeting {
@@ -104,6 +111,7 @@
   padding: 20px;
   text-align: center;
   border-top: 1px solid rgba(0, 255, 255, 0.3);
+  flex-shrink: 0;
 }
 
 .acknowledge-btn {
@@ -142,5 +150,42 @@
   }
   100% {
     top: 100%;
+  }
+}
+
+@media (max-height: 700px) {
+  .modal-content {
+    max-height: 90vh;
+  }
+  
+  .modal-header {
+    padding: 12px;
+  }
+  
+  .lumon-logo {
+    font-size: 24px;
+    margin-bottom: 5px;
+  }
+  
+  .header-text {
+    font-size: 16px;
+  }
+  
+  .modal-body {
+    padding: 15px;
+  }
+  
+  .greeting {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+  
+  .support-message {
+    margin-top: 15px;
+    padding: 10px;
+  }
+  
+  .modal-footer {
+    padding: 12px;
   }
 } 
