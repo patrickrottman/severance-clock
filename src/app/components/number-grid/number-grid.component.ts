@@ -67,6 +67,10 @@ export class NumberGridComponent implements OnInit, OnDestroy {
         this.resetEverything();
       });
     
+    // Add visibility change listener to detect tab switching
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    console.log('Added visibility change listener for tab switching');
+    
     // Get current minute for tracking changes
     const now = new Date();
     this.lastCheckedMinute = now.getMinutes();
@@ -164,8 +168,37 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       this.resizeSubscription = null;
     }
     
+    // Remove visibility change listener
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    
     // Ensure all GSAP animations are cleaned up
     gsap.globalTimeline.clear();
+  }
+  
+  // Handle tab visibility changes
+  private handleVisibilityChange = (): void => {
+    if (!document.hidden) {
+      // Tab has become visible again
+      console.log('Tab visibility changed to visible - resetting everything');
+      this.resetEverything();
+      
+      // Handle any animations that might have been in progress
+      if (this.isAnimating) {
+        this.endAnimation();
+      }
+      
+      // Start with clean time selection after reset
+      setTimeout(() => {
+        this.beginAnimation();
+        this.quickInitialTimeSelection().then(() => {
+          this.endAnimation();
+          console.log('Time selection refreshed after tab switch');
+        }).catch(err => {
+          console.error('Error refreshing time selection after tab switch:', err);
+          this.endAnimation();
+        });
+      }, 1000);
+    }
   }
 
   private updateTimeDisplay(time: { hour: number, minute: number }) {
