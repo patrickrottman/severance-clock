@@ -48,6 +48,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   private _lastCursorMove: number = 0;
   private _cursorTimelines: gsap.core.Timeline[] = [];
   private resizeSubscription: Subscription | null = null;
+  private _binnedPositions: Set<number> = new Set<number>();
 
   constructor(
     private timeService: TimeService,
@@ -1044,8 +1045,8 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       
       console.log(`Hovering over cell ${cellIndex} at position ${position.x}, ${position.y}`);
       
-      // Mark the cell as hovered in our model
-      this.numbers[cellIndex].isHovered = true;
+      // NOTE: Moved this line to after the cursor movement
+      // this.numbers[cellIndex].isHovered = true;
       
       // Adjust movement duration based on distance from previous position
       let moveDuration = 1.2; // Default duration
@@ -1070,6 +1071,9 @@ export class NumberGridComponent implements OnInit, OnDestroy {
         // Small pause to ensure cursor has settled
         await new Promise(resolve => setTimeout(resolve, 100));
       }
+      
+      // FIXED: Only set hover state AFTER cursor has reached the position
+      this.numbers[cellIndex].isHovered = true;
       
       // Create a single timeline for the scale animation to avoid interruptions
       const scaleTimeline = gsap.timeline();
@@ -1154,7 +1158,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
         });
         
         resolve();
-      }, 10000); // Increased from 5000 to 10000 (10 seconds) absolute maximum for animation
+      }, 10000); // 10 seconds absolute maximum for animation
       
       try {
         // Important: Get all required calculations and references up front
@@ -1331,25 +1335,52 @@ export class NumberGridComponent implements OnInit, OnDestroy {
           }
         });
         
-        // Step 1: Gather at center point of the group
-        tl.to(clones, {
-          left: centerX,
-          top: centerY,
-          scale: 1.2,
-          duration: 1.2, // Slower gathering
-          ease: "power1.inOut", // More subtle easing
-          onStart: () => console.log('Starting gather animation to group center')
-        });
-        
-        // Step 2: Move to bin and fade out - slower for dramatic effect
-        tl.to(clones, {
-          left: binFixedX,
-          top: binFixedY + 20, // Move slightly into the bin
-          opacity: 0,
-          scale: 0.5,
-          duration: 1.8, // Much slower fade out
-          ease: "power1.in",
-          onStart: () => console.log('Starting bin animation')
+        // NEW ANIMATION SEQUENCE
+        // Create a more subtle, elegant transition aligned with Severance aesthetic
+
+        // For each clone, create a unique animation path
+        clones.forEach((clone, index) => {
+          // Calculate unique timing offsets for each number (slight stagger)
+          const timeOffset = index * 0.05;
+          
+          // Get random direction vector for initial subtle movement
+          const angle = Math.random() * Math.PI * 2;
+          const distance = 5 + Math.random() * 10; // Small random distance
+          const offsetX = Math.cos(angle) * distance;
+          const offsetY = Math.sin(angle) * distance;
+          
+          // Step 1: Subtle hover with a slight fading glow effect
+          tl.to(clone, {
+            boxShadow: '0 0 15px rgba(0, 255, 255, 0.7)',
+            textShadow: '0 0 15px rgba(0, 255, 255, 0.8)',
+            x: offsetX,
+            y: offsetY,
+            scale: 1.1,
+            duration: 0.9,
+            ease: "sine.inOut",
+            delay: timeOffset
+          }, 0); // Start at the same time with staggered delays
+          
+          // Step 2: Fading distortion effect before moving to bin
+          tl.to(clone, {
+            opacity: 0.9,
+            letterSpacing: '0.1em',
+            scale: 1.0,
+            filter: 'blur(1px)',
+            duration: 0.7,
+            ease: "power1.in"
+          }, 0.7 + timeOffset);
+          
+          // Step 3: Move toward bin with trailing effect
+          tl.to(clone, {
+            left: binFixedX + (Math.random() * 10 - 5), // Slight variation in final positions
+            top: binFixedY,
+            opacity: 0,
+            scale: 0.7,
+            filter: 'blur(2px)',
+            duration: 1.2,
+            ease: "power2.inOut"
+          }, 1.4 + timeOffset);
         });
         
         // Start the animation
@@ -1384,7 +1415,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
             // Resolve promise
             resolve();
           }
-        }, 5000); // Increased from 2000 to 5000 (5 seconds)
+        }, 5000); // 5 seconds
       }
       catch (error) {
         console.error('Error in disposeSelectedNumbers:', error);
@@ -1403,13 +1434,8 @@ export class NumberGridComponent implements OnInit, OnDestroy {
           }
         });
         
-        // Reset model state
         this.clearSelections();
-        
-        // Clear the main safety timeout
         clearTimeout(mainSafetyTimeout);
-        
-        // Resolve promise
         resolve();
       }
     });
@@ -1633,6 +1659,30 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   private async regenerateGridWithCorrectTime(): Promise<void> {
     console.log('Beginning grid regeneration with correct time');
     
+    // Track which numbers have been binned (by position/index)
+    // We need to keep track of these permanently so they don't reappear
+    if (!this._binnedPositions) {
+      this._binnedPositions = new Set<number>();
+    }
+    
+    // Get the current numbers that were visible before bins
+    const oldNumbers = [...this.numbers];
+    const oldNumberCells = document.querySelectorAll('.number-cell');
+    
+    // Update our binned positions tracking by checking visibility
+    Array.from(oldNumberCells).forEach((cell, index) => {
+      if (getComputedStyle(cell).visibility === 'hidden') {
+        this._binnedPositions.add(index);
+      }
+    });
+    
+    console.log(`Tracking ${this._binnedPositions.size} binned positions that will stay hidden`);
+    
+    // Only clone visible cells for the transition
+    const visibleOldNumbers = Array.from(oldNumberCells).filter((cell, index) => 
+      !this._binnedPositions.has(index) && getComputedStyle(cell).visibility !== 'hidden'
+    );
+    
     // Clear any existing GSAP animations on numbers
     this.numbers.forEach(num => {
       gsap.killTweensOf(num);
@@ -1640,6 +1690,126 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     
     // Reset all number properties to clear any lingering animations
     this.clearSelections();
+    
+    // SEVERANCE-STYLE TRANSITION: Create a "data refinement" effect
+    // --------------------------------------------------------------
+    // First capture the current state of the grid to create a seamless transition
+    const gridContainer = document.querySelector('.grid-container') as HTMLElement;
+    if (gridContainer) {
+      // Create a snapshot overlay for the transition effect
+      const transitionOverlay = document.createElement('div');
+      transitionOverlay.className = 'severance-transition-overlay';
+      transitionOverlay.style.position = 'absolute';
+      transitionOverlay.style.top = '0';
+      transitionOverlay.style.left = '0';
+      transitionOverlay.style.width = '100%';
+      transitionOverlay.style.height = '100%';
+      transitionOverlay.style.pointerEvents = 'none';
+      transitionOverlay.style.zIndex = '5000';
+      transitionOverlay.style.opacity = '1';
+      transitionOverlay.style.background = 'transparent';
+      
+      // Only clone cells that were visible (not already binned)
+      visibleOldNumbers.forEach(cell => {
+        const rect = cell.getBoundingClientRect();
+        const gridRect = gridContainer.getBoundingClientRect();
+        
+        // Position relative to grid container
+        const clone = cell.cloneNode(true) as HTMLElement;
+        clone.style.position = 'absolute';
+        clone.style.left = `${rect.left - gridRect.left}px`;
+        clone.style.top = `${rect.top - gridRect.top}px`;
+        clone.style.width = `${rect.width}px`;
+        clone.style.height = `${rect.height}px`;
+        clone.style.pointerEvents = 'none';
+        clone.style.transition = 'none';
+        
+        transitionOverlay.appendChild(clone);
+      });
+      
+      // Add the overlay to the grid container
+      gridContainer.appendChild(transitionOverlay);
+      
+      // Create a brief "severance" effect with scan lines
+      const scanLines = document.createElement('div');
+      scanLines.className = 'severance-scan-lines';
+      scanLines.style.position = 'absolute';
+      scanLines.style.top = '0';
+      scanLines.style.left = '0';
+      scanLines.style.width = '100%';
+      scanLines.style.height = '100%';
+      scanLines.style.backgroundImage = 'linear-gradient(transparent 50%, rgba(0, 255, 255, 0.03) 50%)';
+      scanLines.style.backgroundSize = '100% 4px';
+      scanLines.style.pointerEvents = 'none';
+      scanLines.style.zIndex = '5001';
+      scanLines.style.opacity = '0';
+      
+      gridContainer.appendChild(scanLines);
+      
+      // Create a "data processing" line
+      const dataLine = document.createElement('div');
+      dataLine.className = 'severance-data-line';
+      dataLine.style.position = 'absolute';
+      dataLine.style.left = '0';
+      dataLine.style.top = '0';
+      dataLine.style.width = '100%';
+      dataLine.style.height = '2px';
+      dataLine.style.backgroundColor = 'rgba(0, 255, 255, 0.6)';
+      dataLine.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.8)';
+      dataLine.style.zIndex = '5002';
+      dataLine.style.transform = 'translateY(-10px)';
+      
+      gridContainer.appendChild(dataLine);
+      
+      // Animate the transition
+      const tl = gsap.timeline({
+        onComplete: () => {
+          // Remove transition elements when animation is complete
+          gridContainer.removeChild(transitionOverlay);
+          gridContainer.removeChild(scanLines);
+          gridContainer.removeChild(dataLine);
+        }
+      });
+      
+      // Step 1: Show scan lines and start data processing
+      tl.to(scanLines, {
+        opacity: 0.9,
+        duration: 0.3,
+        ease: 'power1.in'
+      });
+      
+      // Step 2: Animate the data processing line downward
+      tl.to(dataLine, {
+        top: '100%',
+        duration: 1.3,
+        ease: 'power1.inOut'
+      }, 0.1);
+      
+      // Step 3: Fade out the old numbers with a digital distortion effect
+      const clones = transitionOverlay.querySelectorAll('.number-cell');
+      clones.forEach((clone, i) => {
+        // Create a staggered, glitchy fade out
+        const delay = 0.1 + (i % 10) * 0.02;
+        
+        tl.to(clone, {
+          opacity: 0,
+          filter: 'blur(2px)',
+          y: '+=' + (Math.random() * 2 - 1),
+          x: '+=' + (Math.random() * 2 - 1),
+          scale: 0.9,
+          duration: 0.4,
+          ease: 'power1.in',
+          delay: delay
+        }, 0.3);
+      });
+      
+      // Step 4: Fade out scan lines
+      tl.to(scanLines, {
+        opacity: 0,
+        duration: 0.3,
+        ease: 'power1.out'
+      }, 1.2);
+    }
     
     // Generate new grid with fresh numbers
     this.initializeGrid();
@@ -1687,20 +1857,98 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       }
     }
     
-    // Add subtle floating animation to non-time numbers
-    this.numbers.forEach(number => {
-      if (!number.isTimePattern) {
+    // Apply permanent visibility state for binned numbers
+    setTimeout(() => {
+      // Get the newly generated number cells after DOM update
+      const newNumberCells = document.querySelectorAll('.number-cell');
+      
+      // Hide numbers that were previously binned
+      if (this._binnedPositions.size > 0) {
+        console.log(`Hiding ${this._binnedPositions.size} previously binned numbers in new grid`);
+        this._binnedPositions.forEach(pos => {
+          if (pos < newNumberCells.length) {
+            (newNumberCells[pos] as HTMLElement).style.visibility = 'hidden';
+            // Also update the model to match for consistency
+            if (this.numbers[pos]) {
+              this.numbers[pos].opacity = 0;
+            }
+          }
+        });
+      }
+    }, 0);
+    
+    // Improved entry animations for all numbers
+    this.numbers.forEach((number, idx) => {
+      // Skip animation for previously binned numbers
+      if (this._binnedPositions.has(idx)) {
+        number.opacity = 0;
+        return;
+      }
+      
+      // Set initial values for the animation
+      number.opacity = 0;
+      number.scale = 0.5;
+      number.y = Math.random() * 5 - 2.5;
+      
+      // Longer spread out delays for more eerie, computer-like processing
+      const columnPosition = idx % 13; // Based on the default grid columns
+      const rowPosition = Math.floor(idx / 13);
+      
+      // Calculate delay with a subtle "typing machine" effect going from left to right, top to bottom
+      // This creates a feeling of the data being "processed" methodically
+      const delay = 0.6 + (rowPosition * 0.08) + (columnPosition * 0.04);
+      
+      // Different animation for time pattern numbers
+      if (number.isTimePattern) {
+        // More pronounced animation for time digits with a clean, precise feel
+        gsap.fromTo(number, 
+          { 
+            opacity: 0, 
+            scale: 0.2,
+            filter: 'blur(3px)'
+          },
+          {
+            opacity: 0.7, // Match opacity of regular numbers
+            scale: 1,
+            filter: 'blur(0px)',
+            duration: 1.4,
+            delay: delay,
+            ease: "back.out(1.2)",
+            onComplete: () => {
+              // Add subtle floating animation matching regular numbers
+              gsap.to(number, {
+                y: () => (Math.random() * 6 - 3),
+                duration: 2 + Math.random() * 2,
+                repeat: -1,
+                yoyo: true,
+                ease: 'sine.inOut'
+              });
+            }
+          }
+        );
+      } else {
+        // More subtle animation for background numbers
+        // Use a staggered digital appearance effect
         gsap.to(number, {
-          y: () => (Math.random() * 10 - 5),
-          duration: 2 + Math.random() * 2,
-          repeat: -1,
-          yoyo: true,
-          ease: 'power1.inOut'
+          opacity: 0.7,
+          scale: 1,
+          duration: 0.8,
+          delay: delay,
+          ease: "power2.out",
+          onComplete: () => {
+            // Add subtle floating animation
+            gsap.to(number, {
+              y: () => (Math.random() * 6 - 3),
+              duration: 2 + Math.random() * 2,
+              repeat: -1,
+              yoyo: true,
+              ease: 'sine.inOut'
+            });
+          }
         });
       }
     });
     
-    console.log('Grid regenerated successfully');
     return Promise.resolve();
   }
   
@@ -1865,7 +2113,8 @@ export class NumberGridComponent implements OnInit, OnDestroy {
 
   private async selectNumber(number: GridNumber) {
     number.isSelected = true;
-    number.isHovered = true; // Also set hover state when selecting
+    // FIXED: Removed premature hover state setting
+    // number.isHovered = true; // Also set hover state when selecting
     
     // Add click effect with longer duration
     const virtualCursor = document.querySelector('.virtual-cursor');
@@ -1880,6 +2129,9 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       duration: 1.0,
       ease: 'back.out(1.2)'
     });
+    
+    // NOW set the hover state once animation has started
+    number.isHovered = true;
     
     // Pause longer at the peak of the animation
     await new Promise(resolve => setTimeout(resolve, 400));

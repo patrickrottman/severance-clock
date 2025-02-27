@@ -1,0 +1,42 @@
+.severance-container {
+  background-color: #0a192f;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  color: #00ffff;
+  font-family: 'Courier New', monospace;
+  overflow: auto;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  position: relative;
+}
+
+app-number-grid {
+  flex: 1;
+  overflow: hidden;
+}
+
+app-bins, app-location-header, app-footer {
+  flex-shrink: 0;
+}
+
+.fullscreen-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: rgba(0, 255, 255, 0.2);
+  color: #00ffff;
+  border: 1px solid #00ffff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.fullscreen-btn:hover {
+  background-color: rgba(0, 255, 255, 0.5);
+} 

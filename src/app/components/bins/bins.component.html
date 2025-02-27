@@ -1,0 +1,21 @@
+<div class="bins-container">
+  <div class="bins-wrapper">
+    <div 
+      *ngFor="let bin of bins" 
+      class="bin" 
+      [class.active]="bin.active"
+      [class.full]="bin.percentage >= 100"
+    >
+      <div class="bin-id">
+        <div class="lid-left"></div>
+        <div class="lid-center">{{ bin.id }}</div>
+        <div class="lid-right"></div>
+      </div>
+      <div class="bin-meter">
+        <div class="bin-fill" [style.width.%]="bin.percentage"></div>
+      </div>
+      <div class="bin-percentage">{{ bin.percentage }}%</div>
+    </div>
+  </div>
+  <div class="hex-address">{{ hexAddressLeft }} : {{ hexAddressRight }}</div>
+</div> 

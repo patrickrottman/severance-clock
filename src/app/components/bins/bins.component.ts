@@ -13,143 +13,8 @@ interface Bin {
   selector: 'app-bins',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <div class="bins-container">
-      <div class="bins-wrapper">
-        <div 
-          *ngFor="let bin of bins" 
-          class="bin" 
-          [class.active]="bin.active"
-          [class.full]="bin.percentage >= 100"
-        >
-          <div class="bin-id">
-            <div class="lid-left"></div>
-            <div class="lid-center">{{ bin.id }}</div>
-            <div class="lid-right"></div>
-          </div>
-          <div class="bin-meter">
-            <div class="bin-fill" [style.width.%]="bin.percentage"></div>
-          </div>
-          <div class="bin-percentage">{{ bin.percentage }}%</div>
-        </div>
-      </div>
-      <div class="hex-address">{{ hexAddressLeft }} : {{ hexAddressRight }}</div>
-    </div>
-  `,
-  styles: [`
-    .bins-container {
-      width: 100%;
-      background-color: #0a192f;
-      border-top: 1px solid rgba(0, 255, 255, 0.2);
-      display: flex;
-      flex-direction: column;
-      padding-bottom: 0.5rem;
-      position: relative;
-      z-index: 5;
-    }
-
-    .bins-wrapper {
-      display: flex;
-      justify-content: space-around;
-      padding: 0.5rem;
-      perspective: 600px;
-      position: relative;
-    }
-
-    .bin {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 18%;
-      font-family: 'Courier Prime', 'Courier New', monospace;
-      transition: all 0.3s ease;
-      position: relative;
-    }
-
-    .bin-id {
-      color: rgba(0, 255, 255, 0.7);
-      font-size: 1.2rem;
-      padding: 0.3rem 0;
-      width: 100%;
-      text-align: center;
-      border: 1px solid rgba(0, 255, 255, 0.3);
-      position: relative;
-      display: flex;
-      justify-content: center;
-      overflow: visible;
-      background: rgba(10, 25, 47, 0.95);
-      transform-style: preserve-3d;
-    }
-
-    .lid-left, .lid-right {
-      position: absolute;
-      width: 50%;
-      height: 100%;
-      top: 0;
-      background: rgba(10, 25, 47, 0.95);
-      border: 1px solid rgba(0, 255, 255, 0.3);
-      z-index: 5;
-      transform: rotateX(0deg);
-      transform-origin: bottom;
-      backface-visibility: visible;
-    }
-
-    .lid-left {
-      left: 0;
-      border-right: none;
-    }
-
-    .lid-right {
-      right: 0;
-      border-left: none;
-    }
-
-    .lid-center {
-      z-index: 1;
-    }
-
-    .bin-meter {
-      width: 100%;
-      height: 1.5rem;
-      background: rgba(0, 255, 255, 0.1);
-      margin: 0.2rem 0;
-      position: relative;
-      border: 1px solid rgba(0, 255, 255, 0.3);
-    }
-
-    .bin-fill {
-      height: 100%;
-      background: rgba(0, 255, 255, 0.4);
-      transition: width 0.5s ease;
-    }
-
-    .bin-percentage {
-      color: rgba(0, 255, 255, 0.7);
-      font-size: 1rem;
-    }
-
-    .bin.active .bin-id {
-      color: rgba(0, 255, 255, 1);
-      text-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
-    }
-
-    .bin.active .bin-fill {
-      background: rgba(0, 255, 255, 0.7);
-    }
-
-    .bin.full .bin-fill {
-      background: rgba(255, 100, 100, 0.7);
-    }
-
-    .hex-address {
-      color: rgba(0, 255, 255, 0.6);
-      font-family: 'Courier Prime', 'Courier New', monospace;
-      font-size: 1rem;
-      text-align: center;
-      margin-top: 0.5rem;
-      letter-spacing: 1px;
-    }
-  `]
+  templateUrl: './bins.component.html',
+  styleUrls: ['./bins.component.scss']
 })
 export class BinsComponent implements OnInit {
   bins: Bin[] = [
@@ -247,7 +112,7 @@ export class BinsComponent implements OnInit {
             duration: 0.8, // Slower closing
             ease: 'power2.inOut' // Smoother easing
           });
-        }, 1500); // Longer delay before closing
+        }, 3000); // Much longer delay before closing (increased from 1500ms to 3000ms)
       }
     }, 0);
   }
