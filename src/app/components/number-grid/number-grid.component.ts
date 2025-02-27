@@ -49,8 +49,10 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   private _cursorTimelines: gsap.core.Timeline[] = [];
   private resizeSubscription: Subscription | null = null;
   private _binnedPositions: Set<number> = new Set<number>();
-  private _isResetting = false; // Add a flag to track if a reset is already in progress
-  private _resetId = 0; // Add a counter to track reset operations
+  private _isResetting = false;  // Add flag to prevent multiple resets
+  private _resetTimeout: any;    // Track reset timeout
+  private _visibilityTimeout: any;  // Track visibility timeout
+  private _lastVisibilityChange = 0;  // Track last visibility change
 
   constructor(
     private timeService: TimeService,
@@ -163,6 +165,12 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     if (this.timeDisplayTimeout) {
       clearTimeout(this.timeDisplayTimeout);
     }
+    if (this._resetTimeout) {
+      clearTimeout(this._resetTimeout);
+    }
+    if (this._visibilityTimeout) {
+      clearTimeout(this._visibilityTimeout);
+    }
     
     // Clean up resize subscription
     if (this.resizeSubscription) {
@@ -180,19 +188,31 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   // Handle tab visibility changes
   private handleVisibilityChange = (): void => {
     if (!document.hidden) {
+      // Debounce visibility changes
+      const now = Date.now();
+      if (now - this._lastVisibilityChange < 1000) {
+        console.log('Debouncing visibility change');
+        return;
+      }
+      this._lastVisibilityChange = now;
+
+      // Clear any pending visibility timeouts
+      if (this._visibilityTimeout) {
+        clearTimeout(this._visibilityTimeout);
+      }
+      
       // Tab has become visible again
       console.log('Tab visibility changed to visible - resetting everything');
-      // Only reset if we're not already in the middle of a reset
-      if (!this._isResetting) {
-        this.resetEverything();
-      } else {
-        console.log('Reset already in progress, skipping redundant reset');
-      }
       
       // Handle any animations that might have been in progress
       if (this.isAnimating) {
         this.endAnimation();
       }
+      
+      // Schedule reset with a slight delay to ensure proper cleanup
+      this._visibilityTimeout = setTimeout(() => {
+        this.resetEverything();
+      }, 100);
     }
   }
 
@@ -222,8 +242,20 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       });
     }
     
+    // Ensure we have a clean grid container
+    const existingGrids = document.querySelectorAll('.grid-container');
+    if (existingGrids.length === 0) {
+      console.warn('No grid container found, one will be created by the template');
+    } else if (existingGrids.length > 1) {
+      console.warn(`Multiple grid containers found (${existingGrids.length}), cleaning up`);
+      Array.from(existingGrids).slice(1).forEach(grid => {
+        if (grid.parentNode) {
+          grid.parentNode.removeChild(grid);
+        }
+      });
+    }
+    
     // CRITICAL FIX: Reset binned positions when generating a new grid
-    // This prevents previous minute's binned numbers from affecting the new grid
     this._binnedPositions = new Set<number>();
     console.log('Reset binned positions during grid initialization');
     
@@ -1661,290 +1693,301 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   }
   
   private async regenerateGridWithCorrectTime(): Promise<void> {
-    try {
-      // Get numbers that are currently visible (not binned) for transition effect
-      const oldGrid = document.querySelector('.number-grid') as HTMLElement;
-      const visibleOldNumbers: HTMLElement[] = [];
-      if (oldGrid) {
-        const cells = oldGrid.querySelectorAll('.number-cell') as NodeListOf<HTMLElement>;
-        Array.from(cells).forEach(cell => {
-          // Only include visible cells
-          if (cell.style.visibility !== 'hidden' && cell.style.opacity !== '0') {
-            visibleOldNumbers.push(cell);
-          }
-        });
+    // Get the current numbers that were visible before bins
+    const oldNumbers = [...this.numbers];
+    const oldNumberCells = document.querySelectorAll('.number-cell');
+    
+    // Update our binned positions tracking by checking just the models, not the DOM
+    // This way we're tracking which positions/indices are binned, not which DOM elements
+    oldNumbers.forEach((num, index) => {
+      // If a number has zero opacity, consider it binned
+      if (num.opacity === 0) {
+        this._binnedPositions.add(index);
       }
-      
-      // Get the current time (using a different variable name)
-      const currentDate = new Date();
-      const currentTime = {
-        hour: currentDate.getHours() % 12 || 12, // 12-hour format
-        minute: currentDate.getMinutes()
-      };
-      
-      // If there's an ongoing animation, end it
-      if (this.isAnimating) {
-        console.log('Animation still active during grid regeneration, ending it...');
-        this.endAnimation();
+    });
+    
+    console.log(`Tracking ${this._binnedPositions.size} binned positions that will stay hidden in model`);
+    
+    // Only clone visible cells for the transition
+    const visibleOldNumbers = Array.from(oldNumberCells).filter((cell, index) => 
+      !this._binnedPositions.has(index)
+    );
+    
+    // Clear any existing GSAP animations on numbers
+    gsap.killTweensOf(this.numbers);
+    
+    // Take a snapshot of visible elements for animation
+    const numberClones: {element: HTMLElement, rect: DOMRect}[] = [];
+    
+    visibleOldNumbers.forEach(element => {
+      const rect = element.getBoundingClientRect();
+      numberClones.push({
+        element: element as HTMLElement,
+        rect: rect
+      });
+    });
+    
+    console.log(`Created ${numberClones.length} clones for transition animation`);
+    
+    // Initialize new grid
+    this.initializeGrid();
+    
+    // *** CRITICAL: Set the opacity of the binned positions to 0 in the new model ***
+    // This prevents them from showing up during transitions, but allows DOM elements to be reused
+    this._binnedPositions.forEach(index => {
+      if (index < this.numbers.length) {
+        this.numbers[index].opacity = 0;
       }
+    });
+    
+    // Remove duplicate declaration and code
+    // const visibleOldNumbers = Array.from(oldNumberCells).filter((cell, index) => 
+    //  !this._binnedPositions.has(index)
+    // );
+    
+    // Clear any existing GSAP animations on numbers
+    this.numbers.forEach(num => {
+      gsap.killTweensOf(num);
+    });
+    
+    // Reset all number properties to clear any lingering animations
+    this.clearSelections();
+    
+    // SEVERANCE-STYLE TRANSITION: Create a "data refinement" effect
+    // --------------------------------------------------------------
+    // First capture the current state of the grid to create a seamless transition
+    const gridContainer = document.querySelector('.grid-container') as HTMLElement;
+    if (gridContainer) {
+      // Create a snapshot overlay for the transition effect
+      const transitionOverlay = document.createElement('div');
+      transitionOverlay.className = 'severance-transition-overlay';
+      transitionOverlay.style.position = 'absolute';
+      transitionOverlay.style.top = '0';
+      transitionOverlay.style.left = '0';
+      transitionOverlay.style.width = '100%';
+      transitionOverlay.style.height = '100%';
+      transitionOverlay.style.pointerEvents = 'none';
+      transitionOverlay.style.zIndex = '5000';
+      transitionOverlay.style.opacity = '1';
+      transitionOverlay.style.background = 'transparent';
       
-      // Reset all number properties to clear any lingering animations
-      this.numbers.forEach(num => {
-        num.isSelected = false;
-        num.isHovered = false;
-        num.opacity = 1;
-        num.scale = 1;
-        num.x = 0;
-        num.y = 0;
-        num.rotation = 0;
+      // Only clone cells that were visible (not already binned)
+      visibleOldNumbers.forEach(cell => {
+        const rect = cell.getBoundingClientRect();
+        const gridRect = gridContainer.getBoundingClientRect();
+        
+        // Position relative to grid container
+        const clone = cell.cloneNode(true) as HTMLElement;
+        clone.style.position = 'absolute';
+        clone.style.left = `${rect.left - gridRect.left}px`;
+        clone.style.top = `${rect.top - gridRect.top}px`;
+        clone.style.width = `${rect.width}px`;
+        clone.style.height = `${rect.height}px`;
+        clone.style.pointerEvents = 'none';
+        clone.style.transition = 'none';
+        
+        transitionOverlay.appendChild(clone);
       });
       
-      // --------------------------------------------------------------
-      // First capture the current state of the grid to create a seamless transition
-      const gridContainer = document.querySelector('.grid-container') as HTMLElement;
-      if (gridContainer) {
-        // Clean up any existing transition overlays in the grid container
-        const existingOverlays = gridContainer.querySelectorAll('.severance-transition-overlay, .severance-scan-lines, .severance-data-line');
-        existingOverlays.forEach(overlay => {
-          if (overlay.parentNode) {
-            overlay.parentNode.removeChild(overlay);
-          }
-        });
+      // Add the overlay to the grid container
+      gridContainer.appendChild(transitionOverlay);
+      
+      // Create a brief "severance" effect with scan lines
+      const scanLines = document.createElement('div');
+      scanLines.className = 'severance-scan-lines';
+      scanLines.style.position = 'absolute';
+      scanLines.style.top = '0';
+      scanLines.style.left = '0';
+      scanLines.style.width = '100%';
+      scanLines.style.height = '100%';
+      scanLines.style.backgroundImage = 'linear-gradient(transparent 50%, rgba(0, 255, 255, 0.03) 50%)';
+      scanLines.style.backgroundSize = '100% 4px';
+      scanLines.style.pointerEvents = 'none';
+      scanLines.style.zIndex = '5001';
+      scanLines.style.opacity = '0';
+      
+      gridContainer.appendChild(scanLines);
+      
+      // Create a "data processing" line
+      const dataLine = document.createElement('div');
+      dataLine.className = 'severance-data-line';
+      dataLine.style.position = 'absolute';
+      dataLine.style.left = '0';
+      dataLine.style.top = '0';
+      dataLine.style.width = '100%';
+      dataLine.style.height = '2px';
+      dataLine.style.backgroundColor = 'rgba(0, 255, 255, 0.6)';
+      dataLine.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.8)';
+      dataLine.style.zIndex = '5002';
+      dataLine.style.transform = 'translateY(-10px)';
+      
+      gridContainer.appendChild(dataLine);
+      
+      // Animate the transition
+      const tl = gsap.timeline({
+        onComplete: () => {
+          // Remove transition elements when animation is complete
+          gridContainer.removeChild(transitionOverlay);
+          gridContainer.removeChild(scanLines);
+          gridContainer.removeChild(dataLine);
+        }
+      });
+      
+      // Step 1: Show scan lines and start data processing
+      tl.to(scanLines, {
+        opacity: 0.9,
+        duration: 0.3,
+        ease: 'power1.in'
+      });
+      
+      // Step 2: Animate the data processing line downward
+      tl.to(dataLine, {
+        top: '100%',
+        duration: 1.3,
+        ease: 'power1.inOut'
+      }, 0.1);
+      
+      // Step 3: Fade out the old numbers with a digital distortion effect
+      const clones = transitionOverlay.querySelectorAll('.number-cell');
+      clones.forEach((clone, i) => {
+        // Create a staggered, glitchy fade out
+        const delay = 0.1 + (i % 10) * 0.02;
         
-        // Create a snapshot overlay for the transition effect
-        const transitionOverlay = document.createElement('div');
-        transitionOverlay.className = 'severance-transition-overlay';
-        transitionOverlay.style.position = 'absolute';
-        transitionOverlay.style.top = '0';
-        transitionOverlay.style.left = '0';
-        transitionOverlay.style.width = '100%';
-        transitionOverlay.style.height = '100%';
-        transitionOverlay.style.pointerEvents = 'none';
-        transitionOverlay.style.zIndex = '5000';
-        transitionOverlay.style.opacity = '1';
-        transitionOverlay.style.background = 'transparent';
-        
-        // Only clone cells that were visible (not already binned)
-        visibleOldNumbers.forEach(cell => {
-          const rect = cell.getBoundingClientRect();
-          const gridRect = gridContainer.getBoundingClientRect();
-          
-          // Position relative to grid container
-          const clone = cell.cloneNode(true) as HTMLElement;
-          clone.style.position = 'absolute';
-          clone.style.left = `${rect.left - gridRect.left}px`;
-          clone.style.top = `${rect.top - gridRect.top}px`;
-          clone.style.width = `${rect.width}px`;
-          clone.style.height = `${rect.height}px`;
-          clone.style.pointerEvents = 'none';
-          clone.style.transition = 'none';
-          
-          transitionOverlay.appendChild(clone);
-        });
-        
-        // Add the overlay to the grid container
-        gridContainer.appendChild(transitionOverlay);
-        
-        // Create a brief "severance" effect with scan lines
-        const scanLines = document.createElement('div');
-        scanLines.className = 'severance-scan-lines';
-        scanLines.style.position = 'absolute';
-        scanLines.style.top = '0';
-        scanLines.style.left = '0';
-        scanLines.style.width = '100%';
-        scanLines.style.height = '100%';
-        scanLines.style.backgroundImage = 'linear-gradient(transparent 50%, rgba(0, 255, 255, 0.03) 50%)';
-        scanLines.style.backgroundSize = '100% 4px';
-        scanLines.style.pointerEvents = 'none';
-        scanLines.style.zIndex = '5001';
-        scanLines.style.opacity = '0';
-        
-        gridContainer.appendChild(scanLines);
-        
-        // Create a "data processing" line
-        const dataLine = document.createElement('div');
-        dataLine.className = 'severance-data-line';
-        dataLine.style.position = 'absolute';
-        dataLine.style.left = '0';
-        dataLine.style.top = '0';
-        dataLine.style.width = '100%';
-        dataLine.style.height = '2px';
-        dataLine.style.backgroundColor = 'rgba(0, 255, 255, 0.6)';
-        dataLine.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.8)';
-        dataLine.style.zIndex = '5002';
-        dataLine.style.transform = 'translateY(-10px)';
-        
-        gridContainer.appendChild(dataLine);
-        
-        // Animate the transition
-        const tl = gsap.timeline({
-          onComplete: () => {
-            // Remove transition elements when animation is complete
-            gridContainer.removeChild(transitionOverlay);
-            gridContainer.removeChild(scanLines);
-            gridContainer.removeChild(dataLine);
-          }
-        });
-        
-        // Step 1: Show scan lines and start data processing
-        tl.to(scanLines, {
-          opacity: 0.9,
-          duration: 0.3,
-          ease: 'power1.in'
-        });
-        
-        // Step 2: Animate the data processing line downward
-        tl.to(dataLine, {
-          top: '100%',
-          duration: 1.3,
-          ease: 'power1.inOut'
-        }, 0.1);
-        
-        // Step 3: Fade out the old numbers with a digital distortion effect
-        const clones = transitionOverlay.querySelectorAll('.number-cell');
-        clones.forEach((clone, i) => {
-          // Create a staggered, glitchy fade out
-          const delay = 0.1 + (i % 10) * 0.02;
-          
-          tl.to(clone, {
-            opacity: 0,
-            filter: 'blur(2px)',
-            y: '+=' + (Math.random() * 2 - 1),
-            x: '+=' + (Math.random() * 2 - 1),
-            scale: 0.9,
-            duration: 0.4,
-            ease: 'power1.in',
-            delay: delay
-          }, 0.3);
-        });
-        
-        // Step 4: Fade out scan lines
-        tl.to(scanLines, {
+        tl.to(clone, {
           opacity: 0,
-          duration: 0.3,
-          ease: 'power1.out'
-        }, 1.2);
-      }
-      
-      // Generate new grid with fresh numbers
-      this.initializeGrid();
-      
-      // CRITICAL FIX: Immediately hide binned positions right after grid initialization
-      // This ensures they never appear even for a split second
-      if (this._binnedPositions.size > 0) {
-        console.log(`Immediately updating opacity for ${this._binnedPositions.size} binned numbers in new grid`);
-        
-        this._binnedPositions.forEach(pos => {
-          if (pos < this.numbers.length) {
-            // Update only the model, not the DOM visibility
-            this.numbers[pos].opacity = 0;
-          }
-        });
-      }
-      
-      // CRITICAL FIX: Update binned positions in the model, but don't hide DOM elements
-      // This ensures they are tracked as binned but can be reused with new values
-      if (this._binnedPositions.size > 0) {
-        console.log(`Setting opacity to 0 for ${this._binnedPositions.size} binned positions in model`);
-        
-        this._binnedPositions.forEach(pos => {
-          if (pos < this.numbers.length) {
-            // Update only the model, not the DOM, so elements can be reused
-            this.numbers[pos].opacity = 0;
-          }
-        });
-      }
-      
-      // Get current time
-      const now = new Date();
-      const hour = now.getHours() % 12 || 12;
-      const minute = now.getMinutes();
-      const timeDigits = [
-        Math.floor(hour / 10),
-        hour % 10,
-        Math.floor(minute / 10),
-        minute % 10
-      ];
-      
-      console.log(`Verifying grid has correct time: ${hour}:${minute.toString().padStart(2, '0')}`);
-      
-      // Verify time digits are correctly placed
-      if (!this.verifyTimeDigitsInGrid(timeDigits)) {
-        console.error('Time digits verification failed after regeneration');
-        
-        // Try direct manual placement of time digits as a last resort
-        const timePatternCells = this.numbers.filter(n => n.isTimePattern);
-        if (timePatternCells.length === 4) {
-          // Directly assign the correct time digits
-          for (let i = 0; i < 4; i++) {
-            timePatternCells[i].value = timeDigits[i];
-          }
-          console.log('Manually assigned time digits to pattern cells');
-        } else {
-          // If we still can't place the time digits, try one more regeneration
-          console.log('Retrying grid regeneration');
-          
-          // Kill any animations and reinitialize
-          this.numbers.forEach(num => {
-            gsap.killTweensOf(num);
-          });
-          this.clearSelections();
-          this.initializeGrid();
-          
-          // Final verification
-          if (!this.verifyTimeDigitsInGrid(timeDigits)) {
-            console.error('Failed to place time digits after multiple attempts');
-          }
-        }
-      }
-      
-      // Apply model updates for binned numbers after animation
-      setTimeout(() => {
-        // Hide numbers in the model that were previously binned
-        if (this._binnedPositions.size > 0) {
-          console.log(`Setting opacity to 0 for ${this._binnedPositions.size} previously binned positions in model`);
-          this._binnedPositions.forEach(pos => {
-            // Only update the model to ensure cells can be reused with new values
-            if (this.numbers[pos]) {
-              this.numbers[pos].opacity = 0;
-            }
-          });
-        }
-      }, 0);
-      
-      // Improved entry animations for all numbers
-      this.numbers.forEach((number, idx) => {
-        // CRITICAL FIX: Double-check binned positions before animation
-        // This ensures binned numbers never get animated into view
-        if (this._binnedPositions.has(idx)) {
-          // Set opacity to 0 in the model but don't change DOM visibility
-          number.opacity = 0;
-          return; // Skip animation entirely
-        }
-        
-        // INSTANT APPEARANCE - No gradual animations
-        // Set all properties to their final values immediately
-        number.opacity = 0.7; // Final opacity
-        number.scale = 1;     // Final scale
-        number.y = 0;         // Final position
-        
-        // Only add the subtle floating animation for non-time pattern numbers
-        if (!number.isTimePattern) {
-          gsap.to(number, {
-            y: () => (Math.random() * 6 - 3),
-            duration: 2 + Math.random() * 2,
-            repeat: -1,
-            yoyo: true,
-            ease: 'sine.inOut'
-          });
-        }
+          filter: 'blur(2px)',
+          y: '+=' + (Math.random() * 2 - 1),
+          x: '+=' + (Math.random() * 2 - 1),
+          scale: 0.9,
+          duration: 0.4,
+          ease: 'power1.in',
+          delay: delay
+        }, 0.3);
       });
       
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Error during grid regeneration:', error);
-      return Promise.reject(error);
+      // Step 4: Fade out scan lines
+      tl.to(scanLines, {
+        opacity: 0,
+        duration: 0.3,
+        ease: 'power1.out'
+      }, 1.2);
     }
+    
+    // Generate new grid with fresh numbers
+    this.initializeGrid();
+    
+    // CRITICAL FIX: Immediately hide binned positions right after grid initialization
+    // This ensures they never appear even for a split second
+    if (this._binnedPositions.size > 0) {
+      console.log(`Immediately updating opacity for ${this._binnedPositions.size} binned numbers in new grid`);
+      
+      this._binnedPositions.forEach(pos => {
+        if (pos < this.numbers.length) {
+          // Update only the model, not the DOM visibility
+          this.numbers[pos].opacity = 0;
+        }
+      });
+    }
+    
+    // CRITICAL FIX: Update binned positions in the model, but don't hide DOM elements
+    // This ensures they are tracked as binned but can be reused with new values
+    if (this._binnedPositions.size > 0) {
+      console.log(`Setting opacity to 0 for ${this._binnedPositions.size} binned positions in model`);
+      
+      this._binnedPositions.forEach(pos => {
+        if (pos < this.numbers.length) {
+          // Update only the model, not the DOM, so elements can be reused
+          this.numbers[pos].opacity = 0;
+        }
+      });
+    }
+    
+    // Get current time
+    const now = new Date();
+    const hour = now.getHours() % 12 || 12;
+    const minute = now.getMinutes();
+    const timeDigits = [
+      Math.floor(hour / 10),
+      hour % 10,
+      Math.floor(minute / 10),
+      minute % 10
+    ];
+    
+    console.log(`Verifying grid has correct time: ${hour}:${minute.toString().padStart(2, '0')}`);
+    
+    // Verify time digits are correctly placed
+    if (!this.verifyTimeDigitsInGrid(timeDigits)) {
+      console.error('Time digits verification failed after regeneration');
+      
+      // Try direct manual placement of time digits as a last resort
+      const timePatternCells = this.numbers.filter(n => n.isTimePattern);
+      if (timePatternCells.length === 4) {
+        // Directly assign the correct time digits
+        for (let i = 0; i < 4; i++) {
+          timePatternCells[i].value = timeDigits[i];
+        }
+        console.log('Manually assigned time digits to pattern cells');
+      } else {
+        // If we still can't place the time digits, try one more regeneration
+        console.log('Retrying grid regeneration');
+        
+        // Kill any animations and reinitialize
+        this.numbers.forEach(num => {
+          gsap.killTweensOf(num);
+        });
+        this.clearSelections();
+        this.initializeGrid();
+        
+        // Final verification
+        if (!this.verifyTimeDigitsInGrid(timeDigits)) {
+          console.error('Failed to place time digits after multiple attempts');
+        }
+      }
+    }
+    
+    // Apply model updates for binned numbers after animation
+    setTimeout(() => {
+      // Hide numbers in the model that were previously binned
+      if (this._binnedPositions.size > 0) {
+        console.log(`Setting opacity to 0 for ${this._binnedPositions.size} previously binned positions in model`);
+        this._binnedPositions.forEach(pos => {
+          // Only update the model to ensure cells can be reused with new values
+          if (this.numbers[pos]) {
+            this.numbers[pos].opacity = 0;
+          }
+        });
+      }
+    }, 0);
+    
+    // Improved entry animations for all numbers
+    this.numbers.forEach((number, idx) => {
+      // CRITICAL FIX: Double-check binned positions before animation
+      // This ensures binned numbers never get animated into view
+      if (this._binnedPositions.has(idx)) {
+        // Set opacity to 0 in the model but don't change DOM visibility
+        number.opacity = 0;
+        return; // Skip animation entirely
+      }
+      
+      // INSTANT APPEARANCE - No gradual animations
+      // Set all properties to their final values immediately
+      number.opacity = 0.7; // Final opacity
+      number.scale = 1;     // Final scale
+      number.y = 0;         // Final position
+      
+      // Only add the subtle floating animation for non-time pattern numbers
+      if (!number.isTimePattern) {
+        gsap.to(number, {
+          y: () => (Math.random() * 6 - 3),
+          duration: 2 + Math.random() * 2,
+          repeat: -1,
+          yoyo: true,
+          ease: 'sine.inOut'
+        });
+      }
+    });
+    
+    return Promise.resolve();
   }
   
   private verifyTimeDigitsInGrid(timeDigits: number[]): boolean {
@@ -2217,16 +2260,22 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   }
 
   private resetEverything(): void {
-    // Prevent multiple concurrent resets
+    // Prevent multiple resets from running simultaneously
     if (this._isResetting) {
-      console.log('Reset already in progress, skipping redundant reset');
+      console.log('Reset already in progress, skipping');
       return;
     }
-
-    // Set reset lock and generate a unique ID for this reset operation
+    
     this._isResetting = true;
-    const currentResetId = ++this._resetId;
-    console.log(`Performing complete reset of application state (ID: ${currentResetId})`);
+    console.log('Performing complete reset of application state');
+    
+    // Clear any pending timeouts
+    if (this._resetTimeout) {
+      clearTimeout(this._resetTimeout);
+    }
+    if (this.timeSelectionTimeout) {
+      clearTimeout(this.timeSelectionTimeout);
+    }
     
     // First, check if we're in the middle of an animation
     if (this.isAnimating) {
@@ -2253,7 +2302,8 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Reset cursor position based on new window size
     this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
     
-    // Remove any animation overlays that might be stuck
+    // IMPORTANT: Clean up ALL grid-related elements
+    // First, remove any animation overlays
     const overlays = document.querySelectorAll('body > div[style*="z-index: 9999"]');
     overlays.forEach(overlay => {
       if (overlay.parentNode) {
@@ -2261,59 +2311,72 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Also remove any transition overlays
-    const transitionOverlays = document.querySelectorAll('body > div.severance-transition-overlay');
-    transitionOverlays.forEach(overlay => {
-      if (overlay.parentNode) {
-        overlay.parentNode.removeChild(overlay);
-      }
-    });
+    // Clean up grid containers properly
+    const gridContainers = document.querySelectorAll('.grid-container');
+    if (gridContainers.length > 1) {
+      console.warn(`Found ${gridContainers.length} grid containers, cleaning up extras`);
+      // Keep only the first grid container, remove others
+      Array.from(gridContainers).slice(1).forEach(container => {
+        if (container.parentNode) {
+          container.parentNode.removeChild(container);
+        }
+      });
+    }
 
-    // Remove any other high z-index elements that might have been left over
-    const highZIndexElements = document.querySelectorAll('body > div[style*="z-index: 5000"]');
-    highZIndexElements.forEach(element => {
-      if (element.parentNode) {
-        element.parentNode.removeChild(element);
+    // Clean up inner number grids
+    const numberGrids = document.querySelectorAll('.number-grid');
+    if (numberGrids.length > 1) {
+      console.warn(`Found ${numberGrids.length} number grids, cleaning up extras`);
+      Array.from(numberGrids).slice(1).forEach(grid => {
+        if (grid.parentNode) {
+          grid.parentNode.removeChild(grid);
+        }
+      });
+    }
+
+    // Clean up any orphaned number cells
+    const numberCells = document.querySelectorAll('.number-cell');
+    numberCells.forEach(cell => {
+      const isInValidGrid = cell.closest('.number-grid');
+      if (!isInValidGrid && cell.parentNode) {
+        cell.parentNode.removeChild(cell);
       }
     });
     
-    // Reset any number cells visibility
-    const numberCells = document.querySelectorAll('.number-cell');
-    Array.from(numberCells).forEach(cell => {
+    // Reset any remaining number cells visibility
+    const remainingCells = document.querySelectorAll('.grid-container:first-child .number-cell');
+    Array.from(remainingCells).forEach(cell => {
       (cell as HTMLElement).style.visibility = '';
+      (cell as HTMLElement).style.opacity = '';
+      (cell as HTMLElement).style.transform = '';
     });
+    
+    // Clear the numbers array before reinitializing
+    this.numbers = [];
     
     // Get current minute to prevent immediate binning
     const now = new Date();
     this.lastCheckedMinute = now.getMinutes();
     
-    // Empty the numbers array before initializing a new grid
-    this.numbers = [];
-    
     // Finally, reinitialize the grid with new dimensions
-    this.initializeGrid();
-    
-    // Start with quick initial time selection (without binning) after a delay
-    // to give the DOM time to update
+    // Add a small delay to ensure DOM is clean
     setTimeout(() => {
-      // Check if this reset operation is still the most recent one
-      if (currentResetId !== this._resetId) {
-        console.log(`Reset ${currentResetId} was superseded by newer reset, skipping time selection`);
-        this._isResetting = false;
-        return;
-      }
-
-      console.log('Starting initial time selection after reset');
-      this.beginAnimation();
-      this.quickInitialTimeSelection().then(() => {
-        this.endAnimation();
-        console.log('Initial time selection after reset complete');
-        this._isResetting = false; // Release the reset lock when done
-      }).catch(err => {
-        console.error('Error in initial time selection after reset:', err);
-        this.endAnimation();
-        this._isResetting = false; // Release the reset lock even on error
-      });
-    }, 1000);
+      this.initializeGrid();
+      
+      // Start with quick initial time selection after grid is initialized
+      this._resetTimeout = setTimeout(() => {
+        console.log('Starting initial time selection after reset');
+        this.beginAnimation();
+        this.quickInitialTimeSelection().then(() => {
+          this.endAnimation();
+          console.log('Initial time selection after reset complete');
+          this._isResetting = false;  // Reset can happen again
+        }).catch(err => {
+          console.error('Error in initial time selection after reset:', err);
+          this.endAnimation();
+          this._isResetting = false;  // Reset can happen again
+        });
+      }, 500);  // Reduced from 1000ms to 500ms for better responsiveness
+    }, 100);
   }
 } 
