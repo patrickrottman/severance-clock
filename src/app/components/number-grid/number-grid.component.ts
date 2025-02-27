@@ -436,69 +436,28 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       console.log('Time digits successfully placed in the grid:', timeDigitsInGrid);
     }
 
-    // Set initial positions for entrance animation
-    // Numbers will start from outside the grid and scroll in
+    // Set all numbers to their final positions immediately
     this.numbers.forEach((number, index) => {
-      // Calculate which direction the number should come from based on its position
-      const row = Math.floor(index / columns);
-      const col = index % columns;
-      
-      // Default y position (from top for top half, from bottom for bottom half)
-      let startY, startX;
-      
-      // Determine entrance direction based on position in grid
-      if (row < rows/2) {
-        // Top half - come from above
-        startY = -50 - (Math.random() * 100);
-        startX = number.x; // Keep X position
-      } else {
-        // Bottom half - come from below
-        startY = 50 + (Math.random() * 100);
-        startX = number.x; // Keep X position
+      // Set to final state immediately - no entrance animation
+      number.y = 0;       // Final Y position
+      number.x = 0;       // Final X position
+      number.opacity = number.isTimePattern ? 0.7 : 0.6 + Math.random() * 0.2; // Final opacity
+      number.scale = 1;   // Final scale
+    });
+    
+    // Skip entrance animation and just add floating animation
+    this.numbers.forEach(number => {
+      // Only add floating animation to non-time pattern numbers
+      if (!number.isTimePattern) {
+        gsap.to(number, {
+          y: () => (Math.random() * 6 - 3),
+          duration: 2 + Math.random() * 2,
+          repeat: -1,
+          yoyo: true,
+          ease: 'sine.inOut'
+        });
       }
-      
-      // Apply starting position
-      number.y = startY;
-      number.x = startX;
-      number.opacity = 0; // Start invisible
     });
-    
-    // Create the entrance animation
-    const entranceTimeline = gsap.timeline();
-    
-    // Animate numbers scrolling into view with a slower, more deliberate pace
-    this.numbers.forEach((number, index) => {
-      // Stagger the animations for a wave effect
-      const delay = Math.random() * 0.8; // Longer random delay for a more mysterious feel
-      
-      entranceTimeline.to(number, {
-        y: 0, // Final position
-        x: 0,
-        opacity: number.opacity, // Restore original opacity
-        duration: 1.5, // Slower entrance
-        ease: "power1.inOut", // More subtle easing
-        delay: delay
-      }, 0); // All start at the same time but with individual delays
-    });
-    
-    // Add floating animation for non-time digits after they arrive
-    entranceTimeline.add(() => {
-      // Add subtle floating animation only to non-time pattern numbers
-      this.numbers.forEach(number => {
-        if (!number.isTimePattern) {
-          gsap.to(number, {
-            y: () => (Math.random() * 8 - 4), // More subtle movement
-            duration: 4 + Math.random() * 3, // Much slower floating
-            repeat: -1,
-            yoyo: true,
-            ease: 'sine.inOut' // Gentler sine wave motion
-          });
-        }
-      });
-    });
-    
-    // Start the animation
-    entranceTimeline.play();
   }
 
   private getNumberPosition(element: HTMLElement, context: string = 'unknown'): { x: number; y: number } {
@@ -1130,6 +1089,9 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     
     console.log('Disposing selected numbers:', selectedIndices);
     
+    // IMPORTANT: Don't hide the numbers immediately - we want to see them during the animation
+    // We'll add them to _binnedPositions after animation completes
+    
     // Kill ALL ongoing animations
     gsap.globalTimeline.clear();
     
@@ -1140,6 +1102,17 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       // Critical safety timeout - ensures animation never gets stuck
       const mainSafetyTimeout = setTimeout(() => {
         console.warn('CRITICAL SAFETY TIMEOUT - Animation took too long, forcing cleanup');
+        
+        // Even on timeout, we should still track the binned positions
+        selectedIndices.forEach(idx => {
+          this._binnedPositions.add(idx);
+          
+          // Set opacity in the model to 0, but don't hide DOM elements permanently
+          if (idx < this.numbers.length) {
+            this.numbers[idx].opacity = 0;
+          }
+        });
+        
         this.clearSelections();
         this.endAnimation(); // Ensure animation state is reset
         
@@ -1149,12 +1122,6 @@ export class NumberGridComponent implements OnInit, OnDestroy {
           if (overlay.parentNode) {
             overlay.parentNode.removeChild(overlay);
           }
-        });
-        
-        // Restore visibility of all number cells
-        const numberCells = document.querySelectorAll('.number-cell');
-        Array.from(numberCells).forEach(cell => {
-          (cell as HTMLElement).style.visibility = '';
         });
         
         resolve();
@@ -1309,6 +1276,20 @@ export class NumberGridComponent implements OnInit, OnDestroy {
             console.log('Animation timeline completed normally');
             animationCompleted = true;
             
+            // NOW is when we update the _binnedPositions 
+            // after the animation has finished
+            selectedIndices.forEach(idx => {
+              // Track which positions are binned
+              this._binnedPositions.add(idx);
+              
+              // Update the opacity in the model, but don't permanently hide DOM elements
+              if (idx < this.numbers.length) {
+                this.numbers[idx].opacity = 0;
+              }
+            });
+            
+            console.log(`Added ${selectedIndices.length} positions to binned set after animation, total: ${this._binnedPositions.size}`);
+            
             // Wait a very short moment before cleanup to ensure animation visibility
             setTimeout(() => {
               console.log('Animation complete, removing overlay');
@@ -1319,13 +1300,6 @@ export class NumberGridComponent implements OnInit, OnDestroy {
                 console.log('Animation overlay removed');
               }
               
-              // Show original elements again
-              selectedIndices.forEach(idx => {
-                if (idx < numberCells.length) {
-                  (numberCells[idx] as HTMLElement).style.visibility = '';
-                }
-              });
-              
               // Clear the main safety timeout since we're done
               clearTimeout(mainSafetyTimeout);
               
@@ -1335,9 +1309,6 @@ export class NumberGridComponent implements OnInit, OnDestroy {
           }
         });
         
-        // NEW ANIMATION SEQUENCE
-        // Create a more subtle, elegant transition aligned with Severance aesthetic
-
         // For each clone, create a unique animation path
         clones.forEach((clone, index) => {
           // Calculate unique timing offsets for each number (slight stagger)
@@ -1402,20 +1373,20 @@ export class NumberGridComponent implements OnInit, OnDestroy {
               document.body.removeChild(animationOverlay);
             }
             
-            // Show original elements
+            // Mark as binned to ensure they don't reappear
             selectedIndices.forEach(idx => {
-              if (idx < numberCells.length) {
-                (numberCells[idx] as HTMLElement).style.visibility = '';
+              this._binnedPositions.add(idx);
+              
+              // Update both model and DOM
+              if (idx < this.numbers.length) {
+                this.numbers[idx].opacity = 0;
               }
             });
             
-            // Clear the main safety timeout since we're handling cleanup now
             clearTimeout(mainSafetyTimeout);
-            
-            // Resolve promise
             resolve();
           }
-        }, 5000); // 5 seconds
+        }, 5000);
       }
       catch (error) {
         console.error('Error in disposeSelectedNumbers:', error);
@@ -1657,31 +1628,57 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   }
   
   private async regenerateGridWithCorrectTime(): Promise<void> {
-    console.log('Beginning grid regeneration with correct time');
-    
-    // Track which numbers have been binned (by position/index)
-    // We need to keep track of these permanently so they don't reappear
-    if (!this._binnedPositions) {
-      this._binnedPositions = new Set<number>();
-    }
-    
     // Get the current numbers that were visible before bins
     const oldNumbers = [...this.numbers];
     const oldNumberCells = document.querySelectorAll('.number-cell');
     
-    // Update our binned positions tracking by checking visibility
-    Array.from(oldNumberCells).forEach((cell, index) => {
-      if (getComputedStyle(cell).visibility === 'hidden') {
+    // Update our binned positions tracking by checking just the models, not the DOM
+    // This way we're tracking which positions/indices are binned, not which DOM elements
+    oldNumbers.forEach((num, index) => {
+      // If a number has zero opacity, consider it binned
+      if (num.opacity === 0) {
         this._binnedPositions.add(index);
       }
     });
     
-    console.log(`Tracking ${this._binnedPositions.size} binned positions that will stay hidden`);
+    console.log(`Tracking ${this._binnedPositions.size} binned positions that will stay hidden in model`);
     
     // Only clone visible cells for the transition
     const visibleOldNumbers = Array.from(oldNumberCells).filter((cell, index) => 
-      !this._binnedPositions.has(index) && getComputedStyle(cell).visibility !== 'hidden'
+      !this._binnedPositions.has(index)
     );
+    
+    // Clear any existing GSAP animations on numbers
+    gsap.killTweensOf(this.numbers);
+    
+    // Take a snapshot of visible elements for animation
+    const numberClones: {element: HTMLElement, rect: DOMRect}[] = [];
+    
+    visibleOldNumbers.forEach(element => {
+      const rect = element.getBoundingClientRect();
+      numberClones.push({
+        element: element as HTMLElement,
+        rect: rect
+      });
+    });
+    
+    console.log(`Created ${numberClones.length} clones for transition animation`);
+    
+    // Initialize new grid
+    this.initializeGrid();
+    
+    // *** CRITICAL: Set the opacity of the binned positions to 0 in the new model ***
+    // This prevents them from showing up during transitions, but allows DOM elements to be reused
+    this._binnedPositions.forEach(index => {
+      if (index < this.numbers.length) {
+        this.numbers[index].opacity = 0;
+      }
+    });
+    
+    // Remove duplicate declaration and code
+    // const visibleOldNumbers = Array.from(oldNumberCells).filter((cell, index) => 
+    //  !this._binnedPositions.has(index)
+    // );
     
     // Clear any existing GSAP animations on numbers
     this.numbers.forEach(num => {
@@ -1814,6 +1811,32 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Generate new grid with fresh numbers
     this.initializeGrid();
     
+    // CRITICAL FIX: Immediately hide binned positions right after grid initialization
+    // This ensures they never appear even for a split second
+    if (this._binnedPositions.size > 0) {
+      console.log(`Immediately updating opacity for ${this._binnedPositions.size} binned numbers in new grid`);
+      
+      this._binnedPositions.forEach(pos => {
+        if (pos < this.numbers.length) {
+          // Update only the model, not the DOM visibility
+          this.numbers[pos].opacity = 0;
+        }
+      });
+    }
+    
+    // CRITICAL FIX: Update binned positions in the model, but don't hide DOM elements
+    // This ensures they are tracked as binned but can be reused with new values
+    if (this._binnedPositions.size > 0) {
+      console.log(`Setting opacity to 0 for ${this._binnedPositions.size} binned positions in model`);
+      
+      this._binnedPositions.forEach(pos => {
+        if (pos < this.numbers.length) {
+          // Update only the model, not the DOM, so elements can be reused
+          this.numbers[pos].opacity = 0;
+        }
+      });
+    }
+    
     // Get current time
     const now = new Date();
     const hour = now.getHours() % 12 || 12;
@@ -1857,21 +1880,15 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       }
     }
     
-    // Apply permanent visibility state for binned numbers
+    // Apply model updates for binned numbers after animation
     setTimeout(() => {
-      // Get the newly generated number cells after DOM update
-      const newNumberCells = document.querySelectorAll('.number-cell');
-      
-      // Hide numbers that were previously binned
+      // Hide numbers in the model that were previously binned
       if (this._binnedPositions.size > 0) {
-        console.log(`Hiding ${this._binnedPositions.size} previously binned numbers in new grid`);
+        console.log(`Setting opacity to 0 for ${this._binnedPositions.size} previously binned positions in model`);
         this._binnedPositions.forEach(pos => {
-          if (pos < newNumberCells.length) {
-            (newNumberCells[pos] as HTMLElement).style.visibility = 'hidden';
-            // Also update the model to match for consistency
-            if (this.numbers[pos]) {
-              this.numbers[pos].opacity = 0;
-            }
+          // Only update the model to ensure cells can be reused with new values
+          if (this.numbers[pos]) {
+            this.numbers[pos].opacity = 0;
           }
         });
       }
@@ -1879,72 +1896,28 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     
     // Improved entry animations for all numbers
     this.numbers.forEach((number, idx) => {
-      // Skip animation for previously binned numbers
+      // CRITICAL FIX: Double-check binned positions before animation
+      // This ensures binned numbers never get animated into view
       if (this._binnedPositions.has(idx)) {
+        // Set opacity to 0 in the model but don't change DOM visibility
         number.opacity = 0;
-        return;
+        return; // Skip animation entirely
       }
       
-      // Set initial values for the animation
-      number.opacity = 0;
-      number.scale = 0.5;
-      number.y = Math.random() * 5 - 2.5;
+      // INSTANT APPEARANCE - No gradual animations
+      // Set all properties to their final values immediately
+      number.opacity = 0.7; // Final opacity
+      number.scale = 1;     // Final scale
+      number.y = 0;         // Final position
       
-      // Longer spread out delays for more eerie, computer-like processing
-      const columnPosition = idx % 13; // Based on the default grid columns
-      const rowPosition = Math.floor(idx / 13);
-      
-      // Calculate delay with a subtle "typing machine" effect going from left to right, top to bottom
-      // This creates a feeling of the data being "processed" methodically
-      const delay = 0.6 + (rowPosition * 0.08) + (columnPosition * 0.04);
-      
-      // Different animation for time pattern numbers
-      if (number.isTimePattern) {
-        // More pronounced animation for time digits with a clean, precise feel
-        gsap.fromTo(number, 
-          { 
-            opacity: 0, 
-            scale: 0.2,
-            filter: 'blur(3px)'
-          },
-          {
-            opacity: 0.7, // Match opacity of regular numbers
-            scale: 1,
-            filter: 'blur(0px)',
-            duration: 1.4,
-            delay: delay,
-            ease: "back.out(1.2)",
-            onComplete: () => {
-              // Add subtle floating animation matching regular numbers
-              gsap.to(number, {
-                y: () => (Math.random() * 6 - 3),
-                duration: 2 + Math.random() * 2,
-                repeat: -1,
-                yoyo: true,
-                ease: 'sine.inOut'
-              });
-            }
-          }
-        );
-      } else {
-        // More subtle animation for background numbers
-        // Use a staggered digital appearance effect
+      // Only add the subtle floating animation for non-time pattern numbers
+      if (!number.isTimePattern) {
         gsap.to(number, {
-          opacity: 0.7,
-          scale: 1,
-          duration: 0.8,
-          delay: delay,
-          ease: "power2.out",
-          onComplete: () => {
-            // Add subtle floating animation
-            gsap.to(number, {
-              y: () => (Math.random() * 6 - 3),
-              duration: 2 + Math.random() * 2,
-              repeat: -1,
-              yoyo: true,
-              ease: 'sine.inOut'
-            });
-          }
+          y: () => (Math.random() * 6 - 3),
+          duration: 2 + Math.random() * 2,
+          repeat: -1,
+          yoyo: true,
+          ease: 'sine.inOut'
         });
       }
     });
@@ -2241,6 +2214,10 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     
     // Clear all selections and states
     this.clearSelections();
+    
+    // Clear binned positions to allow fresh start
+    this._binnedPositions.clear();
+    console.log('Cleared all binned positions during reset');
     
     // Reset cursor position based on new window size
     this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
