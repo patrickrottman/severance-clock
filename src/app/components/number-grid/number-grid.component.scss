@@ -99,6 +99,45 @@
   }
 }
 
+// Special handling for ultrawide displays (21:9 and wider)
+@media (min-width: 1400px) and (min-aspect-ratio: 1.8/1) {
+  .grid-container {
+    height: calc(100vh - 300px);
+    min-height: 350px;
+    padding: 0.3rem;
+  }
+
+  .number-grid {
+    gap: min(10px, 0.8vh);
+    padding: 0.3rem;
+  }
+  
+  .number-cell {
+    font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+    width: clamp(32px, 3vw, 44px);
+    height: clamp(32px, 3vw, 44px);
+  }
+}
+
+// Extra special handling for super ultrawide displays (32:9 and similar)
+@media (min-width: 1800px) and (min-aspect-ratio: 2.2/1) {
+  .grid-container {
+    height: calc(100vh - 320px);
+    min-height: 380px;
+  }
+
+  .number-grid {
+    gap: min(12px, 0.9vh);
+    padding: 0.35rem;
+  }
+  
+  .number-cell {
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+    width: clamp(30px, 2.5vw, 42px);
+    height: clamp(30px, 2.5vw, 42px);
+  }
+}
+
 // New Severance-style transition elements
 .severance-transition-overlay {
   position: absolute;
