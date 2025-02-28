@@ -104,18 +104,19 @@
   .grid-container {
     height: calc(100vh - 300px);
     min-height: 350px;
-    padding: 0.3rem;
+    padding: 0.2rem;
   }
 
   .number-grid {
-    gap: min(10px, 0.8vh);
-    padding: 0.3rem;
+    gap: min(7px, 0.6vh);
+    padding: 0.2rem;
   }
   
   .number-cell {
-    font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-    width: clamp(32px, 3vw, 44px);
-    height: clamp(32px, 3vw, 44px);
+    font-size: clamp(0.9rem, 2vw, 1.3rem);
+    width: clamp(26px, 2.5vw, 34px);
+    height: clamp(26px, 2.5vw, 34px);
+    margin: 1px auto;
   }
 }
 
@@ -124,17 +125,19 @@
   .grid-container {
     height: calc(100vh - 320px);
     min-height: 380px;
+    padding: 0.15rem;
   }
 
   .number-grid {
-    gap: min(12px, 0.9vh);
-    padding: 0.35rem;
+    gap: min(6px, 0.5vh);
+    padding: 0.15rem;
   }
   
   .number-cell {
-    font-size: clamp(1.1rem, 2vw, 1.5rem);
-    width: clamp(30px, 2.5vw, 42px);
-    height: clamp(30px, 2.5vw, 42px);
+    font-size: clamp(0.8rem, 1.5vw, 1.1rem);
+    width: clamp(24px, 2vw, 30px);
+    height: clamp(24px, 2vw, 30px);
+    margin: 1px auto;
   }
 }
 

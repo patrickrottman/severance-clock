@@ -225,6 +225,15 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     let horizontalGap = 0;
     let cellMarginH = 0;
     
+    // For ultrawides, we want to use smaller cells to fit more on screen
+    let targetCellSize = 30; // Default target cell size
+    
+    if (aspectRatio > 2.2) { // Super ultrawide (32:9)
+      targetCellSize = 24; // Much smaller cells for super ultrawide
+    } else if (aspectRatio > 1.8) { // Standard ultrawide (21:9)
+      targetCellSize = 26; // Smaller cells for standard ultrawide
+    }
+    
     if (sampleCell) {
       const cellStyles = getComputedStyle(sampleCell);
       const cellRect = sampleCell.getBoundingClientRect();
@@ -256,13 +265,24 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       // Calculate how many columns can fit in the available width
       columns = Math.floor(availableWidth / totalCellWidth);
       
+      // For ultrawides, we want even more columns - adjust the calculation
+      if (aspectRatio > 2.2) { // Super ultrawide
+        // Reduce total cell width by 15% to fit more cells
+        const adjustedCellWidth = totalCellWidth * 0.85;
+        columns = Math.floor(availableWidth / adjustedCellWidth);
+      } else if (aspectRatio > 1.8) { // Standard ultrawide
+        // Reduce total cell width by 10% to fit more cells
+        const adjustedCellWidth = totalCellWidth * 0.9;
+        columns = Math.floor(availableWidth / adjustedCellWidth);
+      }
+      
       console.log(`Precisely calculated columns: ${columns} (for cells of width ${totalCellWidth}px)`);
     } else {
-      // Fall back to previous calculation method
+      // Fall back to previous calculation method but be more aggressive for ultrawides
       if (aspectRatio > 2.2) { // Super ultrawide (like 32:9)
-        columns = Math.max(20, Math.floor(screenWidth / 65)); // More aggressive column count
+        columns = Math.floor(screenWidth / targetCellSize); // Much more aggressive column count
       } else if (aspectRatio > 1.8) { // Standard ultrawide (like 21:9)
-        columns = Math.max(16, Math.floor(screenWidth / 70));
+        columns = Math.floor(screenWidth / targetCellSize); // More aggressive column count
       } else if (currentScreenSize === 'xs') {
         // Mobile phones - use fewer columns on very tall phones to allow for more rows
         if (aspectRatio < 0.5) {
@@ -293,12 +313,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Ensure we have a minimum number of columns
     columns = Math.max(5, columns);
     
-    // For better appearance on ultrawide, ensure we have enough columns
-    if (aspectRatio > 2.2 && columns < 20) {
-      columns = Math.max(columns, 20);
-    } else if (aspectRatio > 1.8 && columns < 16) {
-      columns = Math.max(columns, 16);
-    }
+    // No artificial max limits for columns on ultrawide - let it scale naturally with the screen
     
     // Set the grid columns style
     this.gridColumns = `repeat(${columns}, 1fr)`;
@@ -410,7 +425,8 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       if (currentScreenSize === 'xs' && aspectRatio < 0.6) {
         verticalGap = Math.min(6, screenHeight * 0.007);
       } else if (aspectRatio > 1.8) { // Ultrawide
-        verticalGap = Math.min(9, screenHeight * 0.012);
+        // Use smaller gaps for ultrawides to fit more content
+        verticalGap = Math.min(7, screenHeight * 0.01);
       } else {
         verticalGap = Math.min(8, screenHeight * 0.01);
       }
@@ -432,10 +448,11 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       cellMarginV = parseFloat(cellStyles.marginTop) + parseFloat(cellStyles.marginBottom);
     } else {
       // If no sample cell exists, use calculated values based on screen size
+      // For ultrawides, we want smaller cells to fit more content
       if (aspectRatio > 2.2) { // Super ultrawide (32:9)
-        cellWidth = cellHeight = Math.min(28, screenWidth * 0.02);
+        cellWidth = cellHeight = Math.min(24, screenWidth * 0.015);
       } else if (aspectRatio > 1.8) { // Standard ultrawide (21:9)
-        cellWidth = cellHeight = Math.min(30, screenWidth * 0.025);
+        cellWidth = cellHeight = Math.min(26, screenWidth * 0.018);
       } else if (currentScreenSize === 'xs') {
         if (aspectRatio < 0.5) {
           cellWidth = cellHeight = Math.min(36, screenWidth * 0.07);
@@ -479,12 +496,14 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     let maxRows: number;
     
     // Optimal grid cell count - total number of cells should be proportional to screen size
-    const optimalCellCount = Math.min(300, Math.floor(screenWidth * screenHeight / 6000));
+    const optimalCellCount = Math.min(500, Math.floor(screenWidth * screenHeight / 4000));
     
     if (aspectRatio > 2.2) { // Super ultrawide (32:9)
-      maxRows = Math.min(calculatedRows, 10, Math.ceil(optimalCellCount / columns));
+      // For super ultrawides, allow much more rows - only limit by what fits in the container
+      maxRows = calculatedRows;
     } else if (aspectRatio > 1.8) { // Standard ultrawide (21:9)
-      maxRows = Math.min(calculatedRows, 12, Math.ceil(optimalCellCount / columns));
+      // For standard ultrawides, also allow more rows to fill the space
+      maxRows = calculatedRows;
     } else if (currentScreenSize === 'xs') {
       if (aspectRatio < 0.5) {
         // For extremely tall phones, use almost all available rows
