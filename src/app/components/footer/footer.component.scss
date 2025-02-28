@@ -22,6 +22,7 @@
   flex-wrap: wrap;
   justify-content: center;
   margin-bottom: 2px;
+  gap: 4px;
 }
 
 .footer-link {
@@ -50,13 +51,45 @@
   margin: 0 3px;
 }
 
-/* Responsive adjustments */
-@media (max-width: 600px) {
-  .footer-links {
-    flex-direction: column;
-    gap: 3px;
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .footer-container {
+    padding: 4px 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    backdrop-filter: blur(5px);
   }
-  
+
+  .footer-content {
+    padding: 0 10px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .footer-links {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 12px;
+    margin: 0;
+  }
+
+  .footer-link {
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+
+  /* Hide GitHub and fullscreen toggle */
+  .footer-link[href*="github.com"],
+  button.footer-link.fullscreen-toggle {
+    display: none;
+  }
+
   .footer-divider {
     display: none;
   }

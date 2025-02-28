@@ -39,14 +39,18 @@ export class ResponsiveService {
     }
   }
 
+  getCurrentScreenSize(): ScreenSize {
+    return this.screenSizeSubject.getValue();
+  }
+
   getGridSize(screenSize: ScreenSize): number {
     switch (screenSize) {
-      case 'xs': return 10;
-      case 'sm': return 15;
-      case 'md': return 20;
-      case 'lg': return 25;
-      case 'xl': return 30;
-      default: return 20;
+      case 'xs': return 8;
+      case 'sm': return 10;
+      case 'md': return 15;
+      case 'lg': return 20;
+      case 'xl': return 25;
+      default: return 15;
     }
   }
 } 

@@ -1,4 +1,9 @@
-<div class="grid-container">
+<div class="grid-container" [class.grid-ready]="isGridReady">
+  <!-- Loading overlay to hide initial render -->
+  <div class="grid-loading-overlay" *ngIf="!isGridReady">
+    <div class="grid-loading-spinner"></div>
+  </div>
+  
   <div class="number-grid" [style.grid-template-columns]="gridColumns">
     <div class="virtual-cursor" 
          [class.selecting]="isSelecting"

@@ -4,13 +4,154 @@
   margin: 0.25rem;
   background: #0a192f;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   flex: 1;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 280px);
-  min-height: 300px;
+  min-height: 250px;
+  max-height: calc(100vh - 200px);
   z-index: 10;
+  /* Start with partial opacity to smooth transition */
+  opacity: 0.6;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  
+  &.grid-ready {
+    opacity: 1;
+    transform: translateZ(0);
+    .grid-loading-overlay {
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
+}
+
+// Media queries for different screen sizes
+@media (max-width: 480px) {
+  .grid-container {
+    height: calc(100dvh - 220px);
+    min-height: 180px;
+    padding: 0.15rem;
+    margin: 0.15rem 0.15rem 0;
+  }
+
+  .number-grid {
+    gap: min(6px, 0.5vh);
+    padding: 0.15rem;
+    align-content: center;
+  }
+  
+  .number-cell {
+    font-size: clamp(1rem, 6vw, 1.4rem);
+    width: clamp(20px, 10vw, 36px);
+    height: clamp(20px, 10vw, 36px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 2px auto;
+  }
+}
+
+// Special styling for very tall mobile phones (like iPhone 12 Pro Max in portrait)
+@media (max-width: 480px) and (max-aspect-ratio: 1/2) {
+  .grid-container {
+    height: calc(100dvh - 200px); // Take up more vertical space
+    min-height: 200px;
+  }
+
+  .number-grid {
+    gap: min(5px, 0.4vh); // Smaller gaps to fit more content
+    padding: 0.12rem;
+  }
+  
+  .number-cell {
+    font-size: clamp(0.9rem, 5vw, 1.2rem); // Slightly smaller font
+    width: clamp(18px, 9vw, 32px); // Smaller cells
+    height: clamp(18px, 9vw, 32px);
+    margin: 1px auto;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .grid-container {
+    height: calc(100dvh - 240px);
+    min-height: 200px;
+    padding: 0.18rem;
+    margin: 0.18rem 0.18rem 0;
+  }
+
+  .number-grid {
+    gap: min(7px, 0.6vh);
+    padding: 0.18rem;
+    align-content: center;
+  }
+  
+  .number-cell {
+    font-size: clamp(1.1rem, 5vw, 1.5rem);
+    width: clamp(24px, 8vw, 38px);
+    height: clamp(24px, 8vw, 38px);
+    margin: 2px auto;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 992px) {
+  .number-cell {
+    font-size: clamp(1.2rem, 4vw, 1.6rem);
+    width: clamp(28px, 6vw, 40px);
+    height: clamp(28px, 6vw, 40px);
+    margin: 2px auto;
+  }
+}
+
+@media (min-width: 993px) {
+  .number-cell {
+    font-size: clamp(1.3rem, 3vw, 1.8rem);
+    width: clamp(30px, 4vw, 42px);
+    height: clamp(30px, 4vw, 42px);
+    margin: 2px auto;
+  }
+}
+
+// Special handling for ultrawide displays (21:9 and wider)
+@media (min-width: 1400px) and (min-aspect-ratio: 1.8/1) {
+  .grid-container {
+    height: calc(100vh - 300px);
+    min-height: 350px;
+    padding: 0.2rem;
+  }
+
+  .number-grid {
+    gap: min(7px, 0.6vh);
+    padding: 0.2rem;
+  }
+  
+  .number-cell {
+    font-size: clamp(0.9rem, 2vw, 1.3rem);
+    width: clamp(26px, 2.5vw, 34px);
+    height: clamp(26px, 2.5vw, 34px);
+    margin: 1px auto;
+  }
+}
+
+// Extra special handling for super ultrawide displays (32:9 and similar)
+@media (min-width: 1800px) and (min-aspect-ratio: 2.2/1) {
+  .grid-container {
+    height: calc(100vh - 320px);
+    min-height: 380px;
+    padding: 0.15rem;
+  }
+
+  .number-grid {
+    gap: min(6px, 0.5vh);
+    padding: 0.15rem;
+  }
+  
+  .number-cell {
+    font-size: clamp(0.8rem, 1.5vw, 1.1rem);
+    width: clamp(24px, 2vw, 30px);
+    height: clamp(24px, 2vw, 30px);
+    margin: 1px auto;
+  }
 }
 
 // New Severance-style transition elements
@@ -108,13 +249,14 @@
   display: grid;
   gap: min(8px, 0.7vh);
   justify-content: center;
-  align-content: start;
+  align-content: center;
   padding: 0.25rem;
   position: relative;
   cursor: none;
   height: 100%;
   font-family: 'Courier Prime', 'Courier New', monospace;
   overflow: hidden;
+  place-items: center;
 }
 
 .virtual-cursor {
@@ -146,26 +288,34 @@
     transition: transform 0.6s ease-out;
     will-change: transform;
   }
-
+  
   &.selecting {
     transform: scale(0.8);
     transition: transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
+  
+  // Adjust cursor size for small screens
+  @media (max-width: 480px) {
+    width: 12px;
+    height: 12px;
+    font-size: 12px;
+  }
 }
 
 .number-cell {
-  width: min(30px, 3vw);
-  height: min(30px, 3vw);
+  font-size: clamp(1rem, 2.5vw, 1.3rem);
+  width: clamp(24px, 3.5vw, 38px);
+  height: clamp(24px, 3.5vw, 38px);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Courier Prime', 'Courier New', monospace;
-  font-size: min(1.5rem, 2.5vw);
+  user-select: none;
+  cursor: none;
   color: rgba(0, 255, 255, 0.7);
   position: relative;
   text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
   transition: all 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
-  margin: 2px;
+  margin: 1px auto;
   will-change: transform, opacity, filter;
   backface-visibility: hidden;
   transform: translateZ(0);
@@ -366,4 +516,33 @@
       0 0 30px rgba(0, 255, 255, 0.9),
       0 0 45px rgba(0, 255, 255, 0.7);
   }
+}
+
+// Loading overlay to hide initial render
+.grid-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #0a192f;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.grid-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 2px solid rgba(0, 255, 255, 0.1);
+  border-radius: 50%;
+  border-top-color: rgba(0, 255, 255, 0.7);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 } 

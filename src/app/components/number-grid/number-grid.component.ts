@@ -33,6 +33,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   isSelecting = false;
   formattedTime = '';
   hourPercentage = 0; // Track percentage of current hour
+  isGridReady = false; // Used to control visibility
   
   // Getter for selected count used in the template
   get selectedCount(): number {
@@ -60,14 +61,45 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    // Initialize grid first
-    this.initializeGrid();
+    console.log('=== Grid Initial Load Start ===');
+    // Set grid as not ready initially
+    this.isGridReady = false;
     
-    // Add resize event listener with aggressive debounce
+    // Do initial setup
+    this.setDynamicGridSize();
+    this.initializeGrid();
+    console.log('=== Grid Initial Load Complete ===');
+    
+    // Force a layout recalculation after a delay 
+    setTimeout(() => {
+      console.log('Optimizing grid layout');
+      this.resetEverything();
+      
+      // Show the grid with the optimized layout
+      setTimeout(() => {
+        this.isGridReady = true;
+        console.log('Grid is now visible with optimized layout');
+      }, 50);
+    }, 200);
+    
+    // FALLBACK: Ensure grid becomes visible no matter what
+    setTimeout(() => {
+      if (!this.isGridReady) {
+        console.log('Fallback: Forcing grid to visible state');
+        this.isGridReady = true;
+      }
+    }, 1000);
+    
+    // Add resize event listener with moderate debounce
     this.resizeSubscription = fromEvent(window, 'resize')
-      .pipe(debounceTime(750)) // Very aggressive debounce of 750ms
+      .pipe(debounceTime(250)) // Reduced debounce for better responsiveness
       .subscribe(() => {
         console.log('Window resize detected - resetting everything');
+        // Force a reflow by accessing offsetHeight
+        const container = document.querySelector('.grid-container');
+        if (container) {
+          container.clientHeight; // Force reflow
+        }
         this.resetEverything();
       });
     
@@ -86,48 +118,6 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Initialize cursor position to a valid location
     this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
     
-    // Add a safety timeout to prevent animation from getting stuck
-    setInterval(() => {
-      if (this.isAnimating) {
-        console.log('Animation safety check - how long has animation been running?');
-        // If animation has been running for more than 60 seconds, force reset
-        // Increased from 20 seconds to 60 seconds to accommodate slower animations
-        const animatingTooLong = this._animationStartTime && 
-                                (Date.now() - this._animationStartTime > 60000);
-        if (animatingTooLong) {
-          console.warn('Animation appears stuck - forcing reset');
-          this.resetAnimationState();
-          
-          // Reset cursor to a valid position
-          this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
-        }
-      }
-      
-      // If cursor hasn't moved in 30 seconds, ensure it's visible
-      if (Date.now() - this._lastCursorMove > 30000) {
-        console.log('Cursor hasn\'t moved in 30 seconds, ensuring visibility');
-        const isVisible = this.cursorPosition.x > 0 && this.cursorPosition.y > 0 &&
-                         this.cursorPosition.x < window.innerWidth && 
-                         this.cursorPosition.y < window.innerHeight;
-        if (!isVisible) {
-          this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
-        }
-      }
-    }, 5000);
-    
-    // Start with quick initial time selection (without binning)
-    setTimeout(() => {
-      console.log('Starting initial time selection');
-      this.beginAnimation();
-      this.quickInitialTimeSelection().then(() => {
-        this.endAnimation();
-        console.log('Initial time selection complete');
-      }).catch(err => {
-        console.error('Error in initial time selection:', err);
-        this.endAnimation();
-      });
-    }, 1000);
-    
     // Set up a timer to check for minute changes every second
     setInterval(() => {
       this.checkForMinuteChange();
@@ -144,17 +134,6 @@ export class NumberGridComponent implements OnInit, OnDestroy {
         Math.floor(time.minute / 10),
         time.minute % 10
       ];
-    });
-    
-    this.responsiveService.screenSize$.subscribe(size => {
-      if (size === 'xs') {
-        this.gridColumns = 'repeat(11, 1fr)';
-      } else if (size === 'sm') {
-        this.gridColumns = 'repeat(12, 1fr)';
-      } else {
-        this.gridColumns = 'repeat(13, 1fr)';
-      }
-      this.initializeGrid();
     });
   }
 
@@ -234,6 +213,99 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     return !this.currentTimeDigits.every((digit, i) => digit === newDigits[i]);
   }
 
+  // New method to calculate and set dynamic grid dimensions
+  private setDynamicGridSize(): void {
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    const aspectRatio = screenWidth / screenHeight;
+    
+    console.log('=== Grid Size Calculation Start ===');
+    console.log(`Window dimensions: ${screenWidth}x${screenHeight}, ratio: ${aspectRatio}`);
+    
+    // Get current screen size
+    const currentScreenSize = this.responsiveService.getCurrentScreenSize();
+    console.log(`Responsive service screen size: ${currentScreenSize}`);
+    
+    // Get the grid container to analyze its dimensions
+    const gridContainer = document.querySelector('.grid-container');
+    
+    // Get more precise dimensions using getBoundingClientRect
+    let containerWidth = screenWidth;
+    let availableWidth = screenWidth;
+    let containerHeight = screenHeight;
+    
+    if (gridContainer) {
+      const containerRect = gridContainer.getBoundingClientRect();
+      const containerStyles = getComputedStyle(gridContainer);
+      containerWidth = containerRect.width;
+      containerHeight = containerRect.height;
+      
+      // Calculate available space accounting for padding
+      const containerPaddingLeft = parseFloat(containerStyles.paddingLeft) || 0;
+      const containerPaddingRight = parseFloat(containerStyles.paddingRight) || 0;
+      const containerPaddingTop = parseFloat(containerStyles.paddingTop) || 0;
+      const containerPaddingBottom = parseFloat(containerStyles.paddingBottom) || 0;
+      
+      availableWidth = containerWidth - containerPaddingLeft - containerPaddingRight;
+      const availableHeight = containerHeight - containerPaddingTop - containerPaddingBottom;
+      
+      console.log('Available space:', {
+        width: availableWidth,
+        height: availableHeight
+      });
+    }
+    
+    // Get a sample cell to measure actual dimensions
+    const sampleCell = document.querySelector('.number-cell');
+    let cellWidth = 30; // Default fallback
+    let cellMargin = 2; // Default fallback
+    let horizontalGap = 8; // Default fallback
+    
+    if (sampleCell) {
+      const cellStyles = getComputedStyle(sampleCell);
+      const cellRect = sampleCell.getBoundingClientRect();
+      cellWidth = cellRect.width;
+      cellMargin = parseFloat(cellStyles.marginLeft) + parseFloat(cellStyles.marginRight);
+      
+      // Get grid gap
+      const grid = document.querySelector('.number-grid');
+      if (grid) {
+        const gridStyles = getComputedStyle(grid);
+        horizontalGap = parseFloat(gridStyles.columnGap) || horizontalGap;
+      }
+    }
+    
+    // Calculate total width needed per cell
+    const totalCellWidth = cellWidth + cellMargin + horizontalGap;
+    
+    // Calculate maximum columns that can fit
+    let maxColumns = Math.floor(availableWidth / totalCellWidth);
+    
+    // Adjust columns based on screen size and aspect ratio
+    let columns: number;
+    if (aspectRatio > 2.2) { // Super ultrawide
+      columns = Math.min(maxColumns, 20);
+    } else if (aspectRatio > 1.8) { // Standard ultrawide
+      columns = Math.min(maxColumns, 18);
+    } else if (currentScreenSize === 'xs') {
+      columns = Math.min(maxColumns, 6);
+    } else if (currentScreenSize === 'sm') {
+      columns = Math.min(maxColumns, 8);
+    } else if (currentScreenSize === 'md') {
+      columns = Math.min(maxColumns, 12);
+    } else {
+      columns = Math.min(maxColumns, 15);
+    }
+    
+    // Ensure minimum columns
+    columns = Math.max(5, columns);
+    
+    // Set the grid columns style
+    this.gridColumns = `repeat(${columns}, 1fr)`;
+    console.log(`Final grid columns: ${columns} (max possible: ${maxColumns})`);
+    console.log('=== Grid Size Calculation End ===');
+  }
+
   private initializeGrid(): void {
     // Kill any existing animations on numbers
     if (this.numbers.length > 0) {
@@ -264,19 +336,190 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     
     const columns = parseInt(match[0]);
     
-    // Calculate rows based on container height and cell size
+    // Calculate rows based on container height, available space, and device characteristics
     const gridContainer = document.querySelector('.grid-container');
-    const containerHeight = gridContainer?.clientHeight || 600;
-    
-    // Validate container dimensions
-    if (!gridContainer || containerHeight <= 0) {
-      console.warn('Invalid container height, using fallback value');
+    if (!gridContainer) {
+      console.warn('Grid container not found, aborting grid initialization');
+      return;
     }
     
-    const cellSize = Math.min(32, window.innerWidth * 0.03); // matches CSS
-    const verticalGap = Math.min(8, window.innerHeight * 0.008); // matches CSS
-    const rows = Math.floor((containerHeight - 40) / (cellSize + verticalGap)); // -40 for padding
+    // Get precise container dimensions using getBoundingClientRect for accuracy
+    const containerRect = gridContainer.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+    
+    // Validate container dimensions
+    if (containerWidth <= 0 || containerHeight <= 0) {
+      console.warn(`Invalid container dimensions: ${containerWidth}x${containerHeight}, using fallback values`);
+      return;
+    }
+    
+    // Get number grid element to measure its padding and gap
+    const numberGrid = document.querySelector('.number-grid');
+    if (!numberGrid) {
+      console.warn('Number grid not found, using default values');
+    }
+    
+    // Get computed styles to accurately account for padding, borders and gaps
+    const gridStyles = numberGrid ? getComputedStyle(numberGrid) : null;
+    const containerStyles = getComputedStyle(gridContainer);
+    
+    // Extract padding values from computed styles
+    const gridPaddingTop = gridStyles ? parseFloat(gridStyles.paddingTop) : 4;
+    const gridPaddingRight = gridStyles ? parseFloat(gridStyles.paddingRight) : 4;
+    const gridPaddingBottom = gridStyles ? parseFloat(gridStyles.paddingBottom) : 4;
+    const gridPaddingLeft = gridStyles ? parseFloat(gridStyles.paddingLeft) : 4;
+    
+    const containerPaddingTop = parseFloat(containerStyles.paddingTop);
+    const containerPaddingRight = parseFloat(containerStyles.paddingRight);
+    const containerPaddingBottom = parseFloat(containerStyles.paddingBottom);
+    const containerPaddingLeft = parseFloat(containerStyles.paddingLeft);
+    
+    // Calculate the total padding of container and grid
+    const totalHorizontalPadding = containerPaddingLeft + containerPaddingRight + gridPaddingLeft + gridPaddingRight;
+    const totalVerticalPadding = containerPaddingTop + containerPaddingBottom + gridPaddingTop + gridPaddingBottom;
+    
+    // Calculate the available space inside the grid (excluding padding)
+    const availableWidth = containerWidth - totalHorizontalPadding;
+    const availableHeight = containerHeight - totalVerticalPadding;
+    
+    console.log(`Container dimensions: ${containerWidth}x${containerHeight}px (available: ${availableWidth}x${availableHeight}px)`);
+    console.log(`Total padding: horizontal=${totalHorizontalPadding}px, vertical=${totalVerticalPadding}px`);
+    
+    // Get current screen size and its aspect ratio
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    const aspectRatio = screenWidth / screenHeight;
+    const currentScreenSize = this.responsiveService.getCurrentScreenSize();
+    
+    // Get gap value from computed styles or fall back to calculated values
+    let horizontalGap = gridStyles && gridStyles.columnGap ? parseFloat(gridStyles.columnGap) : 8;
+    let verticalGap = gridStyles && gridStyles.rowGap ? parseFloat(gridStyles.rowGap) : 8;
+    
+    if (isNaN(horizontalGap) || horizontalGap <= 0) {
+      // Fallback if we couldn't get a valid gap value
+      horizontalGap = currentScreenSize === 'xs' ? 6 : 8;
+    }
+    
+    if (isNaN(verticalGap) || verticalGap <= 0) {
+      // Fallback and calculation based on device characteristics (as before)
+      if (currentScreenSize === 'xs' && aspectRatio < 0.6) {
+        verticalGap = Math.min(6, screenHeight * 0.007);
+      } else if (aspectRatio > 1.8) { // Ultrawide
+        // Use smaller gaps for ultrawides to fit more content
+        verticalGap = Math.min(7, screenHeight * 0.01);
+      } else {
+        verticalGap = Math.min(8, screenHeight * 0.01);
+      }
+    }
+    
+    console.log(`Grid gaps: horizontal=${horizontalGap}px, vertical=${verticalGap}px`);
+    
+    // Get cell dimensions with accurate margin calculation
+    // First try to get an existing cell to measure
+    const sampleCell = document.querySelector('.number-cell');
+    let cellWidth, cellHeight, cellMarginH, cellMarginV;
+    
+    if (sampleCell) {
+      const cellStyles = getComputedStyle(sampleCell);
+      const cellRect = sampleCell.getBoundingClientRect();
+      cellWidth = cellRect.width;
+      cellHeight = cellRect.height;
+      cellMarginH = parseFloat(cellStyles.marginLeft) + parseFloat(cellStyles.marginRight);
+      cellMarginV = parseFloat(cellStyles.marginTop) + parseFloat(cellStyles.marginBottom);
+    } else {
+      // If no sample cell exists, use calculated values based on screen size
+      // For ultrawides, we want smaller cells to fit more content
+      if (aspectRatio > 2.2) { // Super ultrawide (32:9)
+        cellWidth = cellHeight = Math.min(24, screenWidth * 0.015);
+      } else if (aspectRatio > 1.8) { // Standard ultrawide (21:9)
+        cellWidth = cellHeight = Math.min(26, screenWidth * 0.018);
+      } else if (currentScreenSize === 'xs') {
+        if (aspectRatio < 0.5) {
+          cellWidth = cellHeight = Math.min(36, screenWidth * 0.07);
+        } else if (aspectRatio < 0.65) {
+          cellWidth = cellHeight = Math.min(38, screenWidth * 0.075);
+        } else {
+          cellWidth = cellHeight = Math.min(40, screenWidth * 0.08);
+        }
+      } else if (currentScreenSize === 'sm') {
+        cellWidth = cellHeight = Math.min(35, screenWidth * 0.06); 
+      } else if (currentScreenSize === 'md') {
+        cellWidth = cellHeight = Math.min(32, screenWidth * 0.04);
+      } else {
+        cellWidth = cellHeight = Math.min(30, screenWidth * 0.03);
+      }
+      
+      // Default margin values if we couldn't measure
+      cellMarginH = 4; // 2px on each side
+      cellMarginV = 4; // 2px on each side
+    }
+    
+    console.log(`Cell dimensions: ${cellWidth}x${cellHeight}px (margins: horizontal=${cellMarginH}px, vertical=${cellMarginV}px)`);
+    
+    // Calculate total cell width and height including margins
+    const totalCellWidth = cellWidth + cellMarginH + horizontalGap;
+    const totalCellHeight = cellHeight + cellMarginV + verticalGap;
+    
+    // Calculate precisely how many columns can fit (we already have a columns value from gridColumns)
+    const calculatedColumns = Math.floor(availableWidth / totalCellWidth);
+    
+    // If our calculated columns differ significantly from our set columns, log a warning
+    if (Math.abs(calculatedColumns - columns) > 2) {
+      console.warn(`Column mismatch: set=${columns}, calculated=${calculatedColumns} (diff=${calculatedColumns - columns})`);
+    }
+    
+    // Calculate precisely how many rows can fit
+    const calculatedRows = Math.floor(availableHeight / totalCellHeight);
+    console.log(`Precisely calculated rows that can fit: ${calculatedRows} (for cells of height ${totalCellHeight}px)`);
+    
+    // Apply aspect ratio adjustments to max rows (similar to before)
+    let maxRows: number;
+    
+    // Optimal grid cell count - total number of cells should be proportional to screen size
+    const optimalCellCount = Math.min(500, Math.floor(screenWidth * screenHeight / 4000));
+    
+    if (aspectRatio > 2.2) { // Super ultrawide (32:9)
+      // For super ultrawides, allow much more rows - only limit by what fits in the container
+      maxRows = calculatedRows;
+    } else if (aspectRatio > 1.8) { // Standard ultrawide (21:9)
+      // For standard ultrawides, also allow more rows to fill the space
+      maxRows = calculatedRows;
+    } else if (currentScreenSize === 'xs') {
+      if (aspectRatio < 0.5) {
+        // For extremely tall phones, use almost all available rows
+        maxRows = calculatedRows;
+      } else if (aspectRatio < 0.65) {
+        maxRows = Math.min(calculatedRows, 18);
+      } else {
+        maxRows = Math.min(calculatedRows, 12);
+      }
+    } else if (currentScreenSize === 'sm') {
+      if (aspectRatio < 0.7) {
+        maxRows = Math.min(calculatedRows, 16);
+      } else if (aspectRatio < 0.9) {
+        maxRows = Math.min(calculatedRows, 14);
+      } else {
+        maxRows = Math.min(calculatedRows, 12);
+      }
+    } else if (currentScreenSize === 'md') {
+      maxRows = aspectRatio < 1.3 ? Math.min(calculatedRows, 18) : Math.min(calculatedRows, 16);
+    } else {
+      maxRows = aspectRatio < 1.6 ? Math.min(calculatedRows, 22) : Math.min(calculatedRows, 20);
+    }
+    
+    // Ensure a minimum number of rows for visual appeal
+    maxRows = Math.max(8, maxRows);
+    
+    // Use precise calculation for rows, with minimum for visual consistency
+    const rows = Math.max(8, Math.min(calculatedRows, maxRows));
+    
+    // Calculate total cells
     const totalCells = rows * columns;
+    
+    console.log(`Aspect ratio: ${aspectRatio.toFixed(2)}, Cell size: ${cellWidth.toFixed(1)}x${cellHeight.toFixed(1)}px`);
+    console.log(`Grid dimensions: ${columns} columns x ${rows} rows = ${totalCells} cells (max: ${maxRows} rows, calculated: ${calculatedRows})`);
+    console.log(`Optimal cell count for screen size: ${optimalCellCount}`);
     
     // Get current time digits - always get fresh time
     const now = new Date();
@@ -2260,123 +2503,53 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   }
 
   private resetEverything(): void {
-    // Prevent multiple resets from running simultaneously
-    if (this._isResetting) {
-      console.log('Reset already in progress, skipping');
-      return;
-    }
+    console.log('=== Grid Reset Start ===');
+    const gridContainer = document.querySelector('.grid-container');
     
-    this._isResetting = true;
-    console.log('Performing complete reset of application state');
-    
-    // Clear any pending timeouts
-    if (this._resetTimeout) {
-      clearTimeout(this._resetTimeout);
-    }
-    if (this.timeSelectionTimeout) {
-      clearTimeout(this.timeSelectionTimeout);
-    }
-    
-    // First, check if we're in the middle of an animation
-    if (this.isAnimating) {
-      console.log('Animation in progress - stopping all animations');
-      this.endAnimation();
-    }
-    
-    // Kill ALL GSAP animations
-    gsap.globalTimeline.clear();
-    this._cursorTimelines.forEach(timeline => {
-      if (timeline.isActive()) {
-        timeline.kill();
-      }
-    });
-    this._cursorTimelines = [];
-    
-    // Clear all selections and states
-    this.clearSelections();
-    
-    // Clear binned positions to allow fresh start
-    this._binnedPositions.clear();
-    console.log('Cleared all binned positions during reset');
-    
-    // Reset cursor position based on new window size
-    this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
-    
-    // IMPORTANT: Clean up ALL grid-related elements
-    // First, remove any animation overlays
-    const overlays = document.querySelectorAll('body > div[style*="z-index: 9999"]');
-    overlays.forEach(overlay => {
-      if (overlay.parentNode) {
-        overlay.parentNode.removeChild(overlay);
-      }
-    });
-
-    // Clean up grid containers properly
-    const gridContainers = document.querySelectorAll('.grid-container');
-    if (gridContainers.length > 1) {
-      console.warn(`Found ${gridContainers.length} grid containers, cleaning up extras`);
-      // Keep only the first grid container, remove others
-      Array.from(gridContainers).slice(1).forEach(container => {
-        if (container.parentNode) {
-          container.parentNode.removeChild(container);
-        }
+    if (gridContainer) {
+      const beforeStyles = getComputedStyle(gridContainer);
+      console.log('Container before reset:', {
+        height: beforeStyles.height,
+        width: beforeStyles.width,
+        rect: gridContainer.getBoundingClientRect()
       });
     }
-
-    // Clean up inner number grids
-    const numberGrids = document.querySelectorAll('.number-grid');
-    if (numberGrids.length > 1) {
-      console.warn(`Found ${numberGrids.length} number grids, cleaning up extras`);
-      Array.from(numberGrids).slice(1).forEach(grid => {
-        if (grid.parentNode) {
-          grid.parentNode.removeChild(grid);
-        }
+    
+    // Briefly hide grid during reset if it's already been shown
+    const wasReady = this.isGridReady;
+    if (wasReady) {
+      this.isGridReady = false;
+    }
+    
+    this.setDynamicGridSize();
+    
+    if (gridContainer) {
+      const afterSizeStyles = getComputedStyle(gridContainer);
+      console.log('Container after size calc:', {
+        height: afterSizeStyles.height,
+        width: afterSizeStyles.width,
+        rect: gridContainer.getBoundingClientRect()
       });
     }
-
-    // Clean up any orphaned number cells
-    const numberCells = document.querySelectorAll('.number-cell');
-    numberCells.forEach(cell => {
-      const isInValidGrid = cell.closest('.number-grid');
-      if (!isInValidGrid && cell.parentNode) {
-        cell.parentNode.removeChild(cell);
-      }
-    });
     
-    // Reset any remaining number cells visibility
-    const remainingCells = document.querySelectorAll('.grid-container:first-child .number-cell');
-    Array.from(remainingCells).forEach(cell => {
-      (cell as HTMLElement).style.visibility = '';
-      (cell as HTMLElement).style.opacity = '';
-      (cell as HTMLElement).style.transform = '';
-    });
+    this.initializeGrid();
     
-    // Clear the numbers array before reinitializing
-    this.numbers = [];
+    if (gridContainer) {
+      const finalStyles = getComputedStyle(gridContainer);
+      console.log('Container after init:', {
+        height: finalStyles.height,
+        width: finalStyles.width,
+        rect: gridContainer.getBoundingClientRect()
+      });
+    }
     
-    // Get current minute to prevent immediate binning
-    const now = new Date();
-    this.lastCheckedMinute = now.getMinutes();
+    // Restore grid visibility after reset if it was previously visible
+    if (wasReady) {
+      setTimeout(() => {
+        this.isGridReady = true;
+      }, 50);
+    }
     
-    // Finally, reinitialize the grid with new dimensions
-    // Add a small delay to ensure DOM is clean
-    setTimeout(() => {
-      this.initializeGrid();
-      
-      // Start with quick initial time selection after grid is initialized
-      this._resetTimeout = setTimeout(() => {
-        console.log('Starting initial time selection after reset');
-        this.beginAnimation();
-        this.quickInitialTimeSelection().then(() => {
-          this.endAnimation();
-          console.log('Initial time selection after reset complete');
-          this._isResetting = false;  // Reset can happen again
-        }).catch(err => {
-          console.error('Error in initial time selection after reset:', err);
-          this.endAnimation();
-          this._isResetting = false;  // Reset can happen again
-        });
-      }, 500);  // Reduced from 1000ms to 500ms for better responsiveness
-    }, 100);
+    console.log('=== Grid Reset Complete ===');
   }
 } 
