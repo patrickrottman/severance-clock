@@ -11,6 +11,18 @@
   height: calc(100vh - 280px);
   min-height: 300px;
   z-index: 10;
+  /* Start with partial opacity to smooth transition */
+  opacity: 0.6;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  
+  &.grid-ready {
+    opacity: 1;
+    transform: translateZ(0);
+    .grid-loading-overlay {
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
 }
 
 // Media queries for different screen sizes
@@ -503,4 +515,33 @@
       0 0 30px rgba(0, 255, 255, 0.9),
       0 0 45px rgba(0, 255, 255, 0.7);
   }
+}
+
+// Loading overlay to hide initial render
+.grid-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #0a192f;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.grid-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 2px solid rgba(0, 255, 255, 0.1);
+  border-radius: 50%;
+  border-top-color: rgba(0, 255, 255, 0.7);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 } 

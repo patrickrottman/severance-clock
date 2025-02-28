@@ -33,6 +33,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   isSelecting = false;
   formattedTime = '';
   hourPercentage = 0; // Track percentage of current hour
+  isGridReady = false; // Used to control visibility
   
   // Getter for selected count used in the template
   get selectedCount(): number {
@@ -61,21 +62,33 @@ export class NumberGridComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     console.log('=== Grid Initial Load Start ===');
+    // Set grid as not ready initially
+    this.isGridReady = false;
+    
+    // Do initial setup
     this.setDynamicGridSize();
     this.initializeGrid();
     console.log('=== Grid Initial Load Complete ===');
     
-    // CRITICAL FIX: Force a second layout pass after initial render
-    // This mimics the resize behavior which properly calculates everything
+    // Force a layout recalculation after a delay 
     setTimeout(() => {
-      console.log('Forcing second layout pass for mobile compatibility');
-      // Force a reflow by accessing offsetHeight
-      const container = document.querySelector('.grid-container');
-      if (container) {
-        container.clientHeight; // Force reflow
-      }
+      console.log('Optimizing grid layout');
       this.resetEverything();
-    }, 300);
+      
+      // Show the grid with the optimized layout
+      setTimeout(() => {
+        this.isGridReady = true;
+        console.log('Grid is now visible with optimized layout');
+      }, 50);
+    }, 200);
+    
+    // FALLBACK: Ensure grid becomes visible no matter what
+    setTimeout(() => {
+      if (!this.isGridReady) {
+        console.log('Fallback: Forcing grid to visible state');
+        this.isGridReady = true;
+      }
+    }, 1000);
     
     // Add resize event listener with moderate debounce
     this.resizeSubscription = fromEvent(window, 'resize')
@@ -2564,6 +2577,12 @@ export class NumberGridComponent implements OnInit, OnDestroy {
       });
     }
     
+    // Briefly hide grid during reset if it's already been shown
+    const wasReady = this.isGridReady;
+    if (wasReady) {
+      this.isGridReady = false;
+    }
+    
     this.setDynamicGridSize();
     
     if (gridContainer) {
@@ -2585,6 +2604,14 @@ export class NumberGridComponent implements OnInit, OnDestroy {
         rect: gridContainer.getBoundingClientRect()
       });
     }
+    
+    // Restore grid visibility after reset if it was previously visible
+    if (wasReady) {
+      setTimeout(() => {
+        this.isGridReady = true;
+      }, 50);
+    }
+    
     console.log('=== Grid Reset Complete ===');
   }
 } 
