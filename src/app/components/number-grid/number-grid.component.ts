@@ -29,11 +29,10 @@ interface GridNumber {
 export class NumberGridComponent implements OnInit, OnDestroy {
   numbers: GridNumber[] = [];
   gridColumns = 'repeat(13, 1fr)';
-  maxRows = 20;  // Default for desktop
   cursorPosition = { x: 0, y: 0 };
   isSelecting = false;
   formattedTime = '';
-  hourPercentage = 0;
+  hourPercentage = 0; // Track percentage of current hour
   
   // Getter for selected count used in the template
   get selectedCount(): number {
@@ -58,29 +57,7 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   constructor(
     private timeService: TimeService,
     private responsiveService: ResponsiveService
-  ) {
-    // Subscribe to screen size changes
-    this.resizeSubscription = this.responsiveService.screenSize$.subscribe(size => {
-      // Adjust grid columns and rows based on screen size
-      switch (size) {
-        case 'xs':
-          this.gridColumns = 'repeat(7, 1fr)';
-          this.maxRows = 15;
-          break;
-        case 'sm':
-          this.gridColumns = 'repeat(8, 1fr)';
-          this.maxRows = 15;
-          break;
-        default:
-          this.gridColumns = 'repeat(13, 1fr)';
-          this.maxRows = 20;
-      }
-      // Reinitialize grid when columns change
-      if (this.numbers.length > 0) {
-        this.initializeGrid();
-      }
-    });
-  }
+  ) {}
 
   ngOnInit() {
     // Initialize grid first
@@ -125,6 +102,17 @@ export class NumberGridComponent implements OnInit, OnDestroy {
         Math.floor(time.minute / 10),
         time.minute % 10
       ];
+    });
+    
+    this.responsiveService.screenSize$.subscribe(size => {
+      if (size === 'xs') {
+        this.gridColumns = 'repeat(8, 1fr)'; // Reduced from 11 to 8 for mobile
+      } else if (size === 'sm') {
+        this.gridColumns = 'repeat(10, 1fr)'; // Reduced from 12 to 10 for small screens
+      } else {
+        this.gridColumns = 'repeat(13, 1fr)';
+      }
+      this.initializeGrid();
     });
   }
 
@@ -205,50 +193,6 @@ export class NumberGridComponent implements OnInit, OnDestroy {
   }
 
   private initializeGrid(): void {
-    // Clear existing numbers
-    this.numbers = [];
-    
-    // Calculate total cells based on columns and maxRows
-    const gridColumns = parseInt(this.gridColumns.match(/repeat\((\d+)/)?.[1] || '13');
-    const gridCells = gridColumns * this.maxRows;
-    
-    // Generate random numbers
-    const usedNumbers = new Set<number>();
-    
-    // Ensure time digits are included
-    this.currentTimeDigits.forEach(digit => {
-      usedNumbers.add(digit);
-    });
-    
-    // Fill remaining cells with random numbers
-    while (usedNumbers.size < gridCells) {
-      const num = Math.floor(Math.random() * 10);
-      usedNumbers.add(num);
-    }
-    
-    // Convert to array and shuffle
-    const numbersArray = Array.from(usedNumbers);
-    for (let i = numbersArray.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [numbersArray[i], numbersArray[j]] = [numbersArray[j], numbersArray[i]];
-    }
-    
-    // Create grid numbers
-    numbersArray.forEach((num, index) => {
-      const gridNumber: GridNumber = {
-        id: index,
-        value: num,
-        isSelected: false,
-        isTimePattern: this.currentTimeDigits.includes(num),
-        isHovered: false,
-        opacity: 1,
-        x: 0,
-        y: 0,
-        scale: 1
-      };
-      this.numbers.push(gridNumber);
-    });
-    
     // Kill any existing animations on numbers
     if (this.numbers.length > 0) {
       this.numbers.forEach(num => {
