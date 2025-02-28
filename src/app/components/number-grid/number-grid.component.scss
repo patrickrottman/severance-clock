@@ -16,10 +16,10 @@
 // Mobile adjustments
 @media (max-width: 768px) {
   .grid-container {
-    height: calc(100dvh - 220px);
+    height: calc(100dvh - 260px);
     min-height: 180px;
     padding: 0.15rem;
-    margin: 0.15rem 0.15rem 0;
+    margin: 0.15rem 0.15rem 0.5rem;
   }
 
   .number-grid {
