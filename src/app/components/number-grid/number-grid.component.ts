@@ -65,6 +65,18 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     this.initializeGrid();
     console.log('=== Grid Initial Load Complete ===');
     
+    // CRITICAL FIX: Force a second layout pass after initial render
+    // This mimics the resize behavior which properly calculates everything
+    setTimeout(() => {
+      console.log('Forcing second layout pass for mobile compatibility');
+      // Force a reflow by accessing offsetHeight
+      const container = document.querySelector('.grid-container');
+      if (container) {
+        container.clientHeight; // Force reflow
+      }
+      this.resetEverything();
+    }, 300);
+    
     // Add resize event listener with moderate debounce
     this.resizeSubscription = fromEvent(window, 'resize')
       .pipe(debounceTime(250)) // Reduced debounce for better responsiveness

@@ -116,13 +116,17 @@
   .bins-container {
     position: relative;
     z-index: 10; /* Increase z-index to ensure visibility */
-    display: flex;
+    display: flex !important;
     flex-direction: column;
     visibility: visible !important; /* Force visibility */
+    min-height: 70px; /* Ensure minimum height on mobile */
+    overflow: visible !important;
+    transform: translateZ(0); /* Force hardware acceleration */
+    will-change: transform; /* Hint for browser to optimize */
   }
   
   .bins-wrapper {
-    display: flex;
+    display: flex !important;
     justify-content: space-around;
     width: 100%;
     overflow-x: visible;
@@ -132,5 +136,12 @@
     min-width: 50px; /* Ensure minimum width on mobile */
     max-width: 18%;
     transform: scale(1) !important; /* Ensure no transforms hide the bins */
+    opacity: 1 !important; /* Force full opacity */
+    position: relative;
+  }
+  
+  /* Fix for Safari 15+ on iPhone */
+  .hex-address {
+    padding-bottom: env(safe-area-inset-bottom, 0px); /* iOS-specific padding */
   }
 } 
