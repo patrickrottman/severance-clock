@@ -86,48 +86,6 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Initialize cursor position to a valid location
     this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
     
-    // Add a safety timeout to prevent animation from getting stuck
-    setInterval(() => {
-      if (this.isAnimating) {
-        console.log('Animation safety check - how long has animation been running?');
-        // If animation has been running for more than 60 seconds, force reset
-        // Increased from 20 seconds to 60 seconds to accommodate slower animations
-        const animatingTooLong = this._animationStartTime && 
-                                (Date.now() - this._animationStartTime > 60000);
-        if (animatingTooLong) {
-          console.warn('Animation appears stuck - forcing reset');
-          this.resetAnimationState();
-          
-          // Reset cursor to a valid position
-          this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
-        }
-      }
-      
-      // If cursor hasn't moved in 30 seconds, ensure it's visible
-      if (Date.now() - this._lastCursorMove > 30000) {
-        console.log('Cursor hasn\'t moved in 30 seconds, ensuring visibility');
-        const isVisible = this.cursorPosition.x > 0 && this.cursorPosition.y > 0 &&
-                         this.cursorPosition.x < window.innerWidth && 
-                         this.cursorPosition.y < window.innerHeight;
-        if (!isVisible) {
-          this.setCursorPosition(window.innerWidth * 0.3, window.innerHeight * 0.3);
-        }
-      }
-    }, 5000);
-    
-    // Start with quick initial time selection (without binning)
-    setTimeout(() => {
-      console.log('Starting initial time selection');
-      this.beginAnimation();
-      this.quickInitialTimeSelection().then(() => {
-        this.endAnimation();
-        console.log('Initial time selection complete');
-      }).catch(err => {
-        console.error('Error in initial time selection:', err);
-        this.endAnimation();
-      });
-    }, 1000);
-    
     // Set up a timer to check for minute changes every second
     setInterval(() => {
       this.checkForMinuteChange();
@@ -148,9 +106,9 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     
     this.responsiveService.screenSize$.subscribe(size => {
       if (size === 'xs') {
-        this.gridColumns = 'repeat(11, 1fr)';
+        this.gridColumns = 'repeat(8, 1fr)'; // Reduced from 11 to 8 for mobile
       } else if (size === 'sm') {
-        this.gridColumns = 'repeat(12, 1fr)';
+        this.gridColumns = 'repeat(10, 1fr)'; // Reduced from 12 to 10 for small screens
       } else {
         this.gridColumns = 'repeat(13, 1fr)';
       }

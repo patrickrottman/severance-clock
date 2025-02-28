@@ -16,10 +16,16 @@
 // Mobile adjustments
 @media (max-width: 768px) {
   .grid-container {
-    height: calc(100vh - 220px);
-    min-height: 250px;
+    height: calc(100dvh - 220px);
+    min-height: 180px;
     padding: 0.15rem;
-    margin: 0.15rem;
+    margin: 0.15rem 0.15rem 0;
+  }
+
+  .number-grid {
+    gap: min(6px, 0.5vh);
+    padding: 0.15rem;
+    align-content: center;
   }
 }
 
@@ -288,10 +294,10 @@
 // Mobile adjustments for number cells
 @media (max-width: 768px) {
   .number-cell {
-    width: min(40px, 4.5vw);
-    height: min(40px, 4.5vw);
-    font-size: min(1.8rem, 3vw);
-    margin: 1.5px;
+    width: min(45px, 5.5vw);
+    height: min(45px, 5.5vw);
+    font-size: min(2rem, 3.5vw);
+    margin: 1px;
   }
 }
 
