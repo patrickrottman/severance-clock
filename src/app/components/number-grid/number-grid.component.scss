@@ -4,12 +4,13 @@
   margin: 0.25rem;
   background: #0a192f;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   flex: 1;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 280px);
-  min-height: 300px;
+  min-height: 250px;
+  max-height: calc(100vh - 200px);
   z-index: 10;
   /* Start with partial opacity to smooth transition */
   opacity: 0.6;
@@ -302,9 +303,9 @@
 }
 
 .number-cell {
-  font-size: 1.3rem;
-  width: clamp(30px, 4vw, 42px);
-  height: clamp(30px, 4vw, 42px);
+  font-size: clamp(1rem, 2.5vw, 1.3rem);
+  width: clamp(24px, 3.5vw, 38px);
+  height: clamp(24px, 3.5vw, 38px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -314,7 +315,7 @@
   position: relative;
   text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
   transition: all 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
-  margin: 2px auto;
+  margin: 1px auto;
   will-change: transform, opacity, filter;
   backface-visibility: hidden;
   transform: translateZ(0);

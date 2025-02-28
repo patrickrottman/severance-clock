@@ -229,142 +229,80 @@ export class NumberGridComponent implements OnInit, OnDestroy {
     // Get the grid container to analyze its dimensions
     const gridContainer = document.querySelector('.grid-container');
     
-    // Get more precise dimensions using getBoundingClientRect if possible
+    // Get more precise dimensions using getBoundingClientRect
     let containerWidth = screenWidth;
     let availableWidth = screenWidth;
+    let containerHeight = screenHeight;
     
     if (gridContainer) {
       const containerRect = gridContainer.getBoundingClientRect();
       const containerStyles = getComputedStyle(gridContainer);
       containerWidth = containerRect.width;
+      containerHeight = containerRect.height;
       
-      // Get container styles
-      const containerPaddingLeft = parseFloat(containerStyles.paddingLeft);
-      const containerPaddingRight = parseFloat(containerStyles.paddingRight);
+      // Calculate available space accounting for padding
+      const containerPaddingLeft = parseFloat(containerStyles.paddingLeft) || 0;
+      const containerPaddingRight = parseFloat(containerStyles.paddingRight) || 0;
+      const containerPaddingTop = parseFloat(containerStyles.paddingTop) || 0;
+      const containerPaddingBottom = parseFloat(containerStyles.paddingBottom) || 0;
       
-      // Calculate available width
       availableWidth = containerWidth - containerPaddingLeft - containerPaddingRight;
+      const availableHeight = containerHeight - containerPaddingTop - containerPaddingBottom;
       
-      console.log(`Grid container dimensions:`, {
-        rect: `${containerRect.width}x${containerRect.height}`,
-        computedHeight: containerStyles.height,
-        offsetHeight: (gridContainer as HTMLElement).offsetHeight,
-        clientHeight: (gridContainer as HTMLElement).clientHeight,
-        availableWidth
+      console.log('Available space:', {
+        width: availableWidth,
+        height: availableHeight
       });
-    } else {
-      console.warn('No grid container found during measurement');
     }
     
-    // Try to measure an existing cell for more accurate sizing
+    // Get a sample cell to measure actual dimensions
     const sampleCell = document.querySelector('.number-cell');
-    let cellWidth = 0;
-    let horizontalGap = 0;
-    let cellMarginH = 0;
-    
-    // For ultrawides, we want to use smaller cells to fit more on screen
-    let targetCellSize = 30; // Default target cell size
-    
-    if (aspectRatio > 2.2) { // Super ultrawide (32:9)
-      targetCellSize = 24; // Much smaller cells for super ultrawide
-    } else if (aspectRatio > 1.8) { // Standard ultrawide (21:9)
-      targetCellSize = 26; // Smaller cells for standard ultrawide
-    }
+    let cellWidth = 30; // Default fallback
+    let cellMargin = 2; // Default fallback
+    let horizontalGap = 8; // Default fallback
     
     if (sampleCell) {
       const cellStyles = getComputedStyle(sampleCell);
       const cellRect = sampleCell.getBoundingClientRect();
       cellWidth = cellRect.width;
-      cellMarginH = parseFloat(cellStyles.marginLeft) + parseFloat(cellStyles.marginRight);
+      cellMargin = parseFloat(cellStyles.marginLeft) + parseFloat(cellStyles.marginRight);
       
-      // Try to get the grid to measure gap
+      // Get grid gap
       const grid = document.querySelector('.number-grid');
       if (grid) {
         const gridStyles = getComputedStyle(grid);
-        horizontalGap = gridStyles.columnGap ? parseFloat(gridStyles.columnGap) : 8;
-      } else {
-        horizontalGap = 8;
+        horizontalGap = parseFloat(gridStyles.columnGap) || horizontalGap;
       }
-      
-      console.log(`Sample cell measurements:`, {
-        rect: `${cellRect.width}x${cellRect.height}`,
-        computedWidth: cellStyles.width,
-        computedHeight: cellStyles.height,
-        margins: `${cellStyles.marginLeft} ${cellStyles.marginRight}`,
-        totalWidth: cellWidth + cellMarginH + horizontalGap
-      });
     }
     
-    // Calculate optimal columns based on screen width, aspect ratio, and measured values
+    // Calculate total width needed per cell
+    const totalCellWidth = cellWidth + cellMargin + horizontalGap;
+    
+    // Calculate maximum columns that can fit
+    let maxColumns = Math.floor(availableWidth / totalCellWidth);
+    
+    // Adjust columns based on screen size and aspect ratio
     let columns: number;
-    
-    // If we have measured a cell, calculate columns more precisely
-    if (cellWidth > 0 && availableWidth > 0) {
-      // Calculate total width needed per cell including margins and gap
-      const totalCellWidth = cellWidth + cellMarginH + horizontalGap;
-      
-      // Calculate how many columns can fit in the available width
-      columns = Math.floor(availableWidth / totalCellWidth);
-      
-      // For ultrawides, we want even more columns - adjust the calculation
-      if (aspectRatio > 2.2) { // Super ultrawide
-        const adjustedCellWidth = totalCellWidth * 0.85;
-        columns = Math.floor(availableWidth / adjustedCellWidth);
-      } else if (aspectRatio > 1.8) { // Standard ultrawide
-        const adjustedCellWidth = totalCellWidth * 0.9;
-        columns = Math.floor(availableWidth / adjustedCellWidth);
-      }
-      
-      console.log(`Column calculation from measurements:`, {
-        totalCellWidth,
-        availableWidth,
-        calculatedColumns: columns
-      });
+    if (aspectRatio > 2.2) { // Super ultrawide
+      columns = Math.min(maxColumns, 20);
+    } else if (aspectRatio > 1.8) { // Standard ultrawide
+      columns = Math.min(maxColumns, 18);
+    } else if (currentScreenSize === 'xs') {
+      columns = Math.min(maxColumns, 6);
+    } else if (currentScreenSize === 'sm') {
+      columns = Math.min(maxColumns, 8);
+    } else if (currentScreenSize === 'md') {
+      columns = Math.min(maxColumns, 12);
     } else {
-      // Fall back to previous calculation method but be more aggressive for ultrawides
-      if (aspectRatio > 2.2) { // Super ultrawide (like 32:9)
-        columns = Math.floor(screenWidth / targetCellSize); // Much more aggressive column count
-      } else if (aspectRatio > 1.8) { // Standard ultrawide (like 21:9)
-        columns = Math.floor(screenWidth / targetCellSize); // More aggressive column count
-      } else if (currentScreenSize === 'xs') {
-        // Mobile phones - use fewer columns on very tall phones to allow for more rows
-        if (aspectRatio < 0.5) {
-          columns = 5; // Very narrow display
-        } else if (aspectRatio < 0.65) {
-          columns = 6; // Standard mobile portrait
-        } else {
-          columns = 7; // Wider mobile devices
-        }
-      } else if (currentScreenSize === 'sm') {
-        // Tablets in portrait or larger phones
-        if (aspectRatio < 0.7) {
-          columns = 7;
-        } else if (aspectRatio < 0.9) {
-          columns = 8;
-        } else {
-          columns = 9;
-        }
-      } else if (currentScreenSize === 'md') {
-        // Small desktops or tablets in landscape
-        columns = aspectRatio < 1.3 ? 10 : 11;
-      } else {
-        // Standard desktop widescreen (16:9, 16:10)
-        columns = aspectRatio < 1.6 ? 13 : 14;
-      }
-      
-      console.log(`Column calculation from fallback:`, {
-        screenWidth,
-        targetCellSize,
-        calculatedColumns: columns
-      });
+      columns = Math.min(maxColumns, 15);
     }
     
-    // Ensure we have a minimum number of columns
+    // Ensure minimum columns
     columns = Math.max(5, columns);
     
     // Set the grid columns style
     this.gridColumns = `repeat(${columns}, 1fr)`;
-    console.log(`Final grid columns: ${columns}`);
+    console.log(`Final grid columns: ${columns} (max possible: ${maxColumns})`);
     console.log('=== Grid Size Calculation End ===');
   }
 
