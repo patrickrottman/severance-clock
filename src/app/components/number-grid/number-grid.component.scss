@@ -13,6 +13,16 @@
   z-index: 10;
 }
 
+// Mobile adjustments
+@media (max-width: 768px) {
+  .grid-container {
+    height: calc(100vh - 220px);
+    min-height: 250px;
+    padding: 0.15rem;
+    margin: 0.15rem;
+  }
+}
+
 // New Severance-style transition elements
 .severance-transition-overlay {
   position: absolute;
@@ -272,6 +282,16 @@
     border-radius: 2px;
     pointer-events: none;
     animation: subtle-pulse 5s infinite;
+  }
+}
+
+// Mobile adjustments for number cells
+@media (max-width: 768px) {
+  .number-cell {
+    width: min(40px, 4.5vw);
+    height: min(40px, 4.5vw);
+    font-size: min(1.8rem, 3vw);
+    margin: 1.5px;
   }
 }
 

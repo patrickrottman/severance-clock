@@ -15,6 +15,28 @@ html, body {
   overflow: hidden;
   background-color: #0a192f;
   font-family: 'Courier Prime', 'Courier New', monospace;
+  position: fixed; /* Prevent bounce on iOS */
+  top: 0;
+  left: 0;
+}
+
+/* Ensure the app container fills the viewport properly */
+.severance-container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+  .severance-container {
+    height: 100%;
+    /* Use the visual viewport height on mobile */
+    height: 100dvh;
+  }
 }
 
 ::-webkit-scrollbar {
