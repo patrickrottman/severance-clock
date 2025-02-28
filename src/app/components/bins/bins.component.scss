@@ -109,4 +109,28 @@
   text-align: center;
   margin-top: 0.5rem;
   letter-spacing: 1px;
+}
+
+/* Mobile-specific adjustments for bins */
+@media (max-width: 768px) {
+  .bins-container {
+    position: relative;
+    z-index: 10; /* Increase z-index to ensure visibility */
+    display: flex;
+    flex-direction: column;
+    visibility: visible !important; /* Force visibility */
+  }
+  
+  .bins-wrapper {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    overflow-x: visible;
+  }
+  
+  .bin {
+    min-width: 50px; /* Ensure minimum width on mobile */
+    max-width: 18%;
+    transform: scale(1) !important; /* Ensure no transforms hide the bins */
+  }
 } 

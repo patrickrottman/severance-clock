@@ -99,3 +99,22 @@ body::after {
 .glow-text {
   text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
 }
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS specific styles */
+  .severance-container {
+    /* Fix for iOS Safari viewport issues */
+    height: -webkit-fill-available;
+    max-height: -webkit-fill-available;
+    overflow: visible;
+  }
+  
+  /* Ensure elements are visible on iOS */
+  app-bins {
+    position: relative !important;
+    z-index: 15 !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+}
