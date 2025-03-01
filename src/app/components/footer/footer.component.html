@@ -1,4 +1,5 @@
 <div class="footer-container">
+  <div id="youtube-player"></div>
   <div class="footer-content">
     <div class="footer-links">
       <a href="https://patrickrottman.com/" target="_blank" class="footer-link">
@@ -19,6 +20,11 @@
       <button (click)="toggleFullscreen()" class="footer-link fullscreen-toggle">
         <span class="link-icon">🖥️</span>
         <span class="link-text">Toggle Fullscreen</span>
+      </button>
+      <span class="footer-divider">|</span>
+      <button (click)="toggleMusic()" class="footer-link music-toggle">
+        <span class="link-icon">{{ (youtubeAudioService.isPlaying$ | async) ? '🔊' : '🔈' }}</span>
+        <span class="link-text">Music To Refine To</span>
       </button>
     </div>
   </div>

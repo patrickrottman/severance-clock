@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { YoutubeAudioService } from '../../services/youtube-audio.service';
 
 @Component({
   selector: 'app-footer',
@@ -10,6 +11,8 @@ import { CommonModule } from '@angular/common';
 })
 export class FooterComponent {
   isFullscreen = false;
+
+  constructor(public youtubeAudioService: YoutubeAudioService) {}
 
   toggleFullscreen() {
     if (!document.fullscreenElement) {
@@ -23,5 +26,9 @@ export class FooterComponent {
         document.exitFullscreen();
       }
     }
+  }
+
+  toggleMusic() {
+    this.youtubeAudioService.togglePlay();
   }
 } 
