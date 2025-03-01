@@ -143,18 +143,14 @@
     padding: 2px 4px;
   }
 
-  /* First hide everything */
-  .footer-divider,
-  .footer-link[href*="github.com"],
-  button.footer-link.fullscreen-toggle,
-  button.footer-link.music-toggle,
-  .episode-countdown {
+  /* Hide everything first */
+  .footer-links > * {
     display: none !important;
   }
 
-  /* Then only show the two we want */
-  .footer-link[href*="patrickrottman.com"],
-  .footer-link[href*="buymeacoffee.com"] {
+  /* Then explicitly show only these two links */
+  .footer-links > a[href="https://patrickrottman.com/"],
+  .footer-links > a[href="https://www.buymeacoffee.com/patrickrottman"] {
     display: flex !important;
   }
 }
