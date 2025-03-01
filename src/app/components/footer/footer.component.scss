@@ -51,6 +51,65 @@
   margin: 0 3px;
 }
 
+.episode-countdown {
+  font-family: 'Courier Prime', 'Courier New', monospace;
+  cursor: help;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border: 1px solid rgba(0, 255, 255, 0.1);
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  &:hover::before {
+    opacity: 1;
+  }
+
+  .link-text {
+    letter-spacing: 1px;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .countdown-segment {
+    display: inline-block;
+    min-width: 24px;
+    text-align: right;
+    position: relative;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(0, 255, 255, 0.2);
+      transform-origin: center;
+      transform: scaleX(0.8);
+    }
+
+    &.blink {
+      animation: blink 2s steps(2) infinite;
+    }
+  }
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 /* Mobile adjustments */
 @media (max-width: 768px) {
   .footer-container {
@@ -84,10 +143,11 @@
     padding: 2px 4px;
   }
 
-  /* Hide GitHub, fullscreen toggle and music toggle on mobile */
+  /* Hide GitHub, fullscreen toggle, music toggle, and episode countdown on mobile */
   .footer-link[href*="github.com"],
   button.footer-link.fullscreen-toggle,
-  button.footer-link.music-toggle {
+  button.footer-link.music-toggle,
+  .episode-countdown {
     display: none;
   }
 

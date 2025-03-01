@@ -28,6 +28,8 @@ declare global {
       }) => {
         playVideo(): void;
         pauseVideo(): void;
+        getCurrentTime(): number;
+        seekTo(seconds: number, allowSeekAhead: boolean): void;
       };
       PlayerState: {
         PLAYING: number;
@@ -40,6 +42,8 @@ declare global {
 type YouTubePlayer = {
   playVideo(): void;
   pauseVideo(): void;
+  getCurrentTime(): number;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
 };
 
 @Injectable({
@@ -50,6 +54,8 @@ export class YoutubeAudioService {
   private isPlayingSubject = new BehaviorSubject<boolean>(false);
   isPlaying$ = this.isPlayingSubject.asObservable();
   private playerReadyPromise: Promise<void> | null = null;
+  private readonly STORAGE_KEY = 'youtube_playback_state';
+  private saveStateInterval: number | null = null;
 
   constructor() {
     // Load YouTube IFrame API
@@ -59,6 +65,19 @@ export class YoutubeAudioService {
       const firstScriptTag = document.getElementsByTagName('script')[0];
       firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
     }
+
+    // Restore state on page load
+    this.restoreState();
+
+    // Save state periodically when playing
+    this.isPlaying$.subscribe(isPlaying => {
+      if (isPlaying && !this.saveStateInterval) {
+        this.saveStateInterval = window.setInterval(() => this.saveState(), 5000);
+      } else if (!isPlaying && this.saveStateInterval) {
+        window.clearInterval(this.saveStateInterval);
+        this.saveStateInterval = null;
+      }
+    });
   }
 
   private initPlayer(): Promise<void> {
@@ -91,6 +110,7 @@ export class YoutubeAudioService {
           },
           events: {
             onReady: () => {
+              this.restorePlaybackPosition();
               resolve();
             },
             onStateChange: (event) => {
@@ -106,6 +126,44 @@ export class YoutubeAudioService {
     return this.playerReadyPromise;
   }
 
+  private saveState() {
+    if (this.player && this.isPlayingSubject.value) {
+      const state = {
+        isPlaying: this.isPlayingSubject.value,
+        position: this.player.getCurrentTime(),
+        timestamp: Date.now()
+      };
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(state));
+    }
+  }
+
+  private restoreState() {
+    const savedState = localStorage.getItem(this.STORAGE_KEY);
+    if (savedState) {
+      const state = JSON.parse(savedState);
+      if (state.isPlaying && Date.now() - state.timestamp < 24 * 60 * 60 * 1000) { // Within 24 hours
+        this.initPlayer().then(() => {
+          if (this.player) {
+            this.player.seekTo(state.position, true);
+            if (state.isPlaying) {
+              this.player.playVideo();
+            }
+          }
+        });
+      }
+    }
+  }
+
+  private restorePlaybackPosition() {
+    const savedState = localStorage.getItem(this.STORAGE_KEY);
+    if (savedState && this.player) {
+      const state = JSON.parse(savedState);
+      if (Date.now() - state.timestamp < 24 * 60 * 60 * 1000) { // Within 24 hours
+        this.player.seekTo(state.position, true);
+      }
+    }
+  }
+
   async togglePlay() {
     if (!this.player) {
       await this.initPlayer();
@@ -113,6 +171,7 @@ export class YoutubeAudioService {
 
     if (this.player) {
       if (this.isPlayingSubject.value) {
+        this.saveState();
         this.player.pauseVideo();
       } else {
         this.player.playVideo();
