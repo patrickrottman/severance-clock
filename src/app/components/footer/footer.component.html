@@ -26,6 +26,16 @@
         <span class="link-icon">{{ (youtubeAudioService.isPlaying$ | async) ? '🔊' : '🔈' }}</span>
         <span class="link-text">Music To Refine To</span>
       </button>
+      <span class="footer-divider">|</span>
+      <div class="footer-link episode-countdown" *ngIf="countdown$ | async as countdown" [title]="countdown.message">
+        <span class="link-icon">⏳</span>
+        <span class="link-text">
+          <span class="countdown-segment" *ngIf="countdown.days > 0">{{ countdown.days }}d</span>
+          <span class="countdown-segment">{{ formatNumber(countdown.hours) }}h</span>
+          <span class="countdown-segment">{{ formatNumber(countdown.minutes) }}m</span>
+          <span class="countdown-segment blink">{{ formatNumber(countdown.seconds) }}s</span>
+        </span>
+      </div>
     </div>
   </div>
 </div> 
