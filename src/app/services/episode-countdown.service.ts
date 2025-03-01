@@ -8,6 +8,12 @@ interface CountdownTime {
   minutes: number;
   seconds: number;
   message: string;
+  episode?: number;
+}
+
+interface EpisodeSchedule {
+  episode: number;
+  releaseDate: Date;
 }
 
 @Injectable({
@@ -15,6 +21,20 @@ interface CountdownTime {
 })
 export class EpisodeCountdownService {
   private countdown$ = new BehaviorSubject<CountdownTime>({ days: 0, hours: 0, minutes: 0, seconds: 0, message: '' });
+  private readonly SEASON_2_SCHEDULE: EpisodeSchedule[] = [
+    {
+      episode: 8,
+      releaseDate: new Date('2025-03-07T02:00:00Z')
+    },
+    {
+      episode: 9,
+      releaseDate: new Date('2025-03-14T02:00:00Z')
+    },
+    {
+      episode: 10,
+      releaseDate: new Date('2025-03-21T02:00:00Z')
+    }
+  ];
 
   constructor() {
     this.startCountdown();
@@ -31,8 +51,19 @@ export class EpisodeCountdownService {
 
   private calculateTimeUntilNextEpisode(): CountdownTime {
     const now = new Date();
-    const nextEpisode = this.getNextEpisodeDate(now);
-    const diff = nextEpisode.getTime() - now.getTime();
+    const nextEpisode = this.getNextEpisodeInfo(now);
+    
+    if (!nextEpisode) {
+      return {
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        seconds: 0,
+        message: 'Season 2 has concluded. Stay tuned for Season 3!'
+      };
+    }
+
+    const diff = nextEpisode.releaseDate.getTime() - now.getTime();
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -41,34 +72,35 @@ export class EpisodeCountdownService {
 
     const message = this.generateMessage(nextEpisode);
 
-    return { days, hours, minutes, seconds, message };
+    return {
+      days,
+      hours,
+      minutes,
+      seconds,
+      message,
+      episode: nextEpisode.episode
+    };
   }
 
-  private generateMessage(nextEpisode: Date): string {
-    const localTime = nextEpisode.toLocaleTimeString(undefined, { 
+  private generateMessage(episodeInfo: EpisodeSchedule): string {
+    const localTime = episodeInfo.releaseDate.toLocaleTimeString(undefined, { 
       hour: 'numeric', 
       minute: 'numeric',
       hour12: true 
     });
-    const localDate = nextEpisode.toLocaleDateString(undefined, { 
+    const localDate = episodeInfo.releaseDate.toLocaleDateString(undefined, { 
       weekday: 'long',
       month: 'long',
       day: 'numeric'
     });
     
-    return `Next episode release: ${localDate} at ${localTime}`;
+    return `Episode ${episodeInfo.episode} releases: ${localDate} at ${localTime}`;
   }
 
-  private getNextEpisodeDate(fromDate: Date): Date {
-    const nextThursday = new Date(fromDate);
-    nextThursday.setUTCHours(1, 0, 0, 0); // 9 PM ET = 1 AM UTC
-    
-    // Move to next Thursday if needed
-    while (nextThursday.getUTCDay() !== 4 || nextThursday.getTime() <= fromDate.getTime()) {
-      nextThursday.setUTCDate(nextThursday.getUTCDate() + 1);
-    }
-    
-    return nextThursday;
+  private getNextEpisodeInfo(fromDate: Date): EpisodeSchedule | null {
+    return this.SEASON_2_SCHEDULE.find(episode => 
+      episode.releaseDate.getTime() > fromDate.getTime()
+    ) || null;
   }
 
   getCountdown(): Observable<CountdownTime> {
