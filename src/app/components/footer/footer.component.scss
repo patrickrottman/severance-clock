@@ -143,16 +143,19 @@
     padding: 2px 4px;
   }
 
-  /* Hide GitHub, fullscreen toggle, music toggle, and episode countdown on mobile */
+  /* First hide everything */
+  .footer-divider,
   .footer-link[href*="github.com"],
   button.footer-link.fullscreen-toggle,
   button.footer-link.music-toggle,
   .episode-countdown {
-    display: none;
+    display: none !important;
   }
 
-  .footer-divider {
-    display: none;
+  /* Then only show the two we want */
+  .footer-link[href*="patrickrottman.com"],
+  .footer-link[href*="buymeacoffee.com"] {
+    display: flex !important;
   }
 }
 
