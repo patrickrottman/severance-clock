@@ -24,6 +24,7 @@ declare global {
         events?: {
           onReady?: () => void;
           onStateChange?: (event: { data: number }) => void;
+          onError?: (event: { data: number }) => void;
         };
       }) => {
         playVideo(): void;
@@ -56,17 +57,10 @@ export class YoutubeAudioService {
   private playerReadyPromise: Promise<void> | null = null;
   private readonly STORAGE_KEY = 'youtube_playback_state';
   private saveStateInterval: number | null = null;
+  private apiLoaded = false;
 
   constructor() {
-    // Load YouTube IFrame API
-    if (!window.YT) {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-    }
-
-    // Restore state on page load
+    this.loadYouTubeAPI();
     this.restoreState();
 
     // Save state periodically when playing
@@ -80,16 +74,50 @@ export class YoutubeAudioService {
     });
   }
 
-  private initPlayer(): Promise<void> {
+  private loadYouTubeAPI(): Promise<void> {
+    return new Promise((resolve) => {
+      if (window.YT && window.YT.Player) {
+        this.apiLoaded = true;
+        resolve();
+        return;
+      }
+
+      // Create a global callback
+      const previousCallback = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        this.apiLoaded = true;
+        if (previousCallback) {
+          previousCallback();
+        }
+        resolve();
+      };
+
+      // Load the API if not already loading
+      if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+      }
+    });
+  }
+
+  private async initPlayer(): Promise<void> {
     if (this.playerReadyPromise) {
       return this.playerReadyPromise;
     }
 
-    this.playerReadyPromise = new Promise((resolve) => {
-      const tryInit = () => {
-        if (!window.YT) {
-          setTimeout(tryInit, 100);
-          return;
+    this.playerReadyPromise = new Promise(async (resolve, reject) => {
+      try {
+        // Wait for API to load
+        await this.loadYouTubeAPI();
+
+        // Create player element if it doesn't exist
+        let playerElement = document.getElementById('youtube-player');
+        if (!playerElement) {
+          playerElement = document.createElement('div');
+          playerElement.id = 'youtube-player';
+          document.body.appendChild(playerElement);
         }
 
         this.player = new window.YT.Player('youtube-player', {
@@ -113,14 +141,19 @@ export class YoutubeAudioService {
               this.restorePlaybackPosition();
               resolve();
             },
+            onError: (event: { data: number }) => {
+              console.error('YouTube Player Error:', event.data);
+              reject(new Error(`YouTube Player Error: ${event.data}`));
+            },
             onStateChange: (event) => {
               this.isPlayingSubject.next(event.data === window.YT.PlayerState.PLAYING);
             }
           }
         });
-      };
-
-      tryInit();
+      } catch (error) {
+        console.error('Error initializing YouTube player:', error);
+        reject(error);
+      }
     });
 
     return this.playerReadyPromise;
@@ -165,17 +198,21 @@ export class YoutubeAudioService {
   }
 
   async togglePlay() {
-    if (!this.player) {
-      await this.initPlayer();
-    }
-
-    if (this.player) {
-      if (this.isPlayingSubject.value) {
-        this.saveState();
-        this.player.pauseVideo();
-      } else {
-        this.player.playVideo();
+    try {
+      if (!this.player) {
+        await this.initPlayer();
       }
+
+      if (this.player) {
+        if (this.isPlayingSubject.value) {
+          this.saveState();
+          this.player.pauseVideo();
+        } else {
+          this.player.playVideo();
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling play state:', error);
     }
   }
 } 
